@@ -109,7 +109,7 @@ export function DonorForm({
           const match = list.find(d => d.donationId === currentId);
           if (match && match.paymentStatus === 'Paid' && submittedDonation.paymentStatus !== 'Paid') {
             setSubmittedDonation(match);
-            setStatusCheckMsg(`🎉 Verified & Confirmed by ${match.confirmedBy || 'Mandap Volunteer'}! Your 80G tax receipt is ready.`);
+            setStatusCheckMsg(`🎉 Verified & Confirmed by ${match.confirmedBy || 'Mandap Volunteer'}! Your receipt is ready.`);
           }
         }
       } catch (e) {}
@@ -119,7 +119,7 @@ export function DonorForm({
       const verifiedDonation = event.detail as DonationRecord;
       if (verifiedDonation && verifiedDonation.donationId === currentId) {
         setSubmittedDonation(verifiedDonation);
-        setStatusCheckMsg(`🎉 Verified & Confirmed by ${verifiedDonation.confirmedBy || 'Mandap Volunteer'}! Your 80G tax receipt is ready.`);
+        setStatusCheckMsg(`🎉 Verified & Confirmed by ${verifiedDonation.confirmedBy || 'Mandap Volunteer'}! Your receipt is ready.`);
       }
     };
 
@@ -134,7 +134,7 @@ export function DonorForm({
             const vDon = event.data?.donation as DonationRecord | undefined;
             if (vDon && vDon.donationId === currentId) {
               setSubmittedDonation(vDon);
-              setStatusCheckMsg(`🎉 Verified & Confirmed by ${vDon.confirmedBy || 'Mandap Volunteer'}! Your 80G tax receipt is ready.`);
+              setStatusCheckMsg(`🎉 Verified & Confirmed by ${vDon.confirmedBy || 'Mandap Volunteer'}! Your receipt is ready.`);
             } else {
               checkStoredDonation();
             }
@@ -192,7 +192,7 @@ export function DonorForm({
 
       if (latest && latest.paymentStatus === 'Paid') {
         setSubmittedDonation(latest);
-        setStatusCheckMsg('🎉 Confirmed! Your official 80G receipt is ready.');
+        setStatusCheckMsg('🎉 Confirmed! Your official receipt is ready.');
         // Automatically open the receipt modal
         onViewReceipt(latest);
       } else {
@@ -348,7 +348,7 @@ export function DonorForm({
                         Offering Confirmed by Volunteer!
                       </h3>
                       <p className="text-xs sm:text-sm text-emerald-100/90 mt-1">
-                        Verified by <strong className="text-white">{submittedDonation.confirmedBy || 'Mandap Volunteer'}</strong>. Your Official 80G Tax Exemption Receipt <span className="font-mono font-bold text-amber-300">#{submittedDonation.donationId}</span> is ready!
+                        Verified by <strong className="text-white">{submittedDonation.confirmedBy || 'Mandap Volunteer'}</strong>. Your Official Receipt <span className="font-mono font-bold text-amber-300">#{submittedDonation.donationId}</span> is ready!
                       </p>
                     </div>
                   </div>
@@ -358,7 +358,7 @@ export function DonorForm({
                     className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-amber-950 font-black text-sm transition shadow-lg flex items-center justify-center gap-2 shrink-0 cursor-pointer"
                   >
                     <Receipt className="w-5 h-5" />
-                    <span>View Official 80G Receipt</span>
+                    <span>View Official Receipt</span>
                   </button>
                 </div>
               ) : (
