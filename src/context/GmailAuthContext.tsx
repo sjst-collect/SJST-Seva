@@ -194,7 +194,7 @@ export function GmailAuthProvider({ children }: { children: React.ReactNode }) {
       setFirebaseUser(user);
       if (user && !userProfile) {
         const profile: GoogleUserProfile = {
-          email: user.email || 'parab.sachin@gmail.com',
+          email: user.email || 'shreejagannathsevatrust.thane@gmail.com',
           name: user.displayName || user.email?.split('@')[0] || 'Admin',
           picture: user.photoURL || undefined,
           uid: user.uid
@@ -254,7 +254,7 @@ export function GmailAuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('sjst_gmail_access_token', token);
 
       const profile: GoogleUserProfile = {
-        email: result.user.email || 'parab.sachin@gmail.com',
+        email: result.user.email || 'shreejagannathsevatrust.thane@gmail.com',
         name: result.user.displayName || result.user.email?.split('@')[0] || 'Admin',
         picture: result.user.photoURL || undefined,
         uid: result.user.uid
