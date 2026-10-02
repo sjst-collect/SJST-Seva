@@ -113,7 +113,7 @@ const [trustConfig, setTrustConfig] = useState<TrustConfig>(() => {
       return saved ? JSON.parse(saved) : {
         name: 'Shree Jagannath Seva Trust',
         tagline: 'Devotion & Service',
-        email: 'info@sjst.org',
+        email: 'shreejagannathsevatrust.thane@gmail.com',
         phone: '',
         address: '',
         upiId: '',
