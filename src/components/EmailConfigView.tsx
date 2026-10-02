@@ -51,13 +51,6 @@ interface SenderProfile {
 
 const INITIAL_SENDER_PROFILES: SenderProfile[] = [
   {
-    id: 'sachin-admin',
-    email: 'parab.sachin@gmail.com',
-    name: 'Sachin Parab (Admin / Authorized Sender)',
-    role: 'Managing Trustee & Authorized Signatory',
-    isDefault: true
-  },
-  {
     id: 'trust-official',
     email: 'shreejagannathsevatrust.thane@gmail.com',
     name: 'SHREE JAGANNATH SEVA TRUST, THANE',
@@ -104,12 +97,12 @@ export function EmailConfigView({
 
   // Current Active Sender Information
   const currentAuth = trustConfig.gmailAuth || {
-    senderEmail: userProfile?.email || trustConfig.email || 'parab.sachin@gmail.com',
-    senderName: userProfile?.name || trustConfig.name || 'Sachin Parab (Admin)',
+    senderEmail: userProfile?.email || trustConfig.email || 'shreejagannathsevatrust.thane@gmail.com',
+    senderName: userProfile?.name || trustConfig.name || 'SHREE JAGANNATH SEVA TRUST',
     authMethod: 'google_oauth' as const,
     isAuthenticated: isGoogleConnected,
     authenticatedAt: new Date().toISOString(),
-    replyToEmail: userProfile?.email || trustConfig.email || 'parab.sachin@gmail.com',
+    replyToEmail: userProfile?.email || trustConfig.email || 'shreejagannathsevatrust.thane@gmail.com',
     dailyQuotaUsed: 14,
     dailyQuotaLimit: 500
   };
@@ -134,7 +127,7 @@ export function EmailConfigView({
   const [sendError, setSendError] = useState<string | null>(null);
 
   // Test email states
-  const [testRecipient, setTestRecipient] = useState(userProfile?.email || 'parab.sachin@gmail.com');
+  const [testRecipient, setTestRecipient] = useState(userProfile?.email || 'shreejagannathsevatrust.thane@gmail.com');
   const [testAmount, setTestAmount] = useState(5001);
   const [testSevaHead, setTestSevaHead] = useState('Anna Dana');
   const [isSendingTest, setIsSendingTest] = useState(false);
@@ -356,7 +349,7 @@ export function EmailConfigView({
     const dummyDonation: DonationRecord = {
       donationId: sampleReceiptNo,
       submittedAt: new Date().toISOString(),
-      donorName: 'Sachin Parab (Devotee)',
+      donorName: 'SHREE JAGANNATH SEVA TRUST',
       email: testRecipient.trim(),
       amount: testAmount,
       paymentMode: 'UPI',
@@ -782,7 +775,7 @@ export function EmailConfigView({
                     type="email"
                     value={replyToEmail}
                     onChange={(e) => setReplyToEmail(e.target.value)}
-                    placeholder="parab.sachin@gmail.com"
+                    placeholder="shreejagannathsevatrust.thane@gmail.com"
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-mono text-xs focus:ring-2 focus:ring-amber-500 outline-none"
                   />
                   <span className="text-[10px] text-slate-500 mt-1 block">Replies from donors will be routed here</span>
@@ -915,7 +908,7 @@ export function EmailConfigView({
                   type="email"
                   value={testRecipient}
                   onChange={(e) => setTestRecipient(e.target.value)}
-                  placeholder="parab.sachin@gmail.com"
+                  placeholder="shreejagannathsevatrust.thane@gmail.com"
                   required
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-300 font-mono text-xs focus:ring-2 focus:ring-amber-500 outline-none"
                 />
@@ -1018,7 +1011,7 @@ export function EmailConfigView({
                     onClick={() => onViewReceipt({
                       donationId: sampleReceiptNo,
                       submittedAt: new Date().toISOString(),
-                      donorName: 'Sachin Parab (Devotee)',
+                      donorName: 'SHREE JAGANNATH SEVA TRUST',
                       email: testRecipient,
                       amount: testAmount,
                       paymentMode: 'UPI',
@@ -1142,7 +1135,7 @@ export function EmailConfigView({
                   type="text"
                   value={newProfileName}
                   onChange={(e) => setNewProfileName(e.target.value)}
-                  placeholder="e.g. Temple Secretary (Sachin Parab)"
+                  placeholder="e.g. Temple Secretary (SHREE JAGANNATH SEVA TRUST)"
                   required
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-amber-500 outline-none"
                 />
