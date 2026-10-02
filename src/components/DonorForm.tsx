@@ -738,7 +738,7 @@ export function DonorForm({
               {/* Email Address (Mandatory for digital receipt delivery) */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                  Email ID (For 80G Tax Exemption Receipt) <span className="text-rose-500">*</span>
+                  Email ID (For Receipt) <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
