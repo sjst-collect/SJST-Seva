@@ -1,6 +1,6 @@
 import { DonationRecord, TrustConfig, VolunteerRecord } from '../types';
-export const TARGET_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbwo2HwQRNS8R5Vm81jHn87QFU75_xT64hdaTjEcvQfU84VAVchMwL7_JlP9EcNU2-w/exec';
-export const DEFAULT_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbwo2HwQRNS8R5Vm81jHn87QFU75_xT64hdaTjEcvQfU84VAVchMwL7_JlP9EcNU2-w/exec';
+export const TARGET_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbyqpWTtvnZgmX1aN_atWUvH1fAeq8uwpYC0Zl-QrulToG-jtGYwNsA6xjkicRkia99xIg/exec';
+export const DEFAULT_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbyqpWTtvnZgmX1aN_atWUvH1fAeq8uwpYC0Zl-QrulToG-jtGYwNsA6xjkicRkia99xIg/exec';
 
 export interface GoogleSheetsSyncConfig {
   spreadsheetId?: string;
@@ -8,8 +8,8 @@ export interface GoogleSheetsSyncConfig {
   webhookUrl?: string; // Google Apps Script Webhook URL
   autoSync: boolean;
 }
-export const TARGET_SPREADSHEET_ID = '1VfbM7FPXIniD_WftrFbNK6bmdd05GZAr6eluazShJBc';
-export const TARGET_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1VfbM7FPXIniD_WftrFbNK6bmdd05GZAr6eluazShJBc/edit';
+export const TARGET_SPREADSHEET_ID = '1G-UXpoANZg3lBOHQBN3fTjd_elDGGZ2dVsiLVUQHjs8';
+export const TARGET_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1G-UXpoANZg3lBOHQBN3fTjd_elDGGZ2dVsiLVUQHjs8/edit';
 
 export const DEFAULT_SHEETS_CONFIG: GoogleSheetsSyncConfig = {
   spreadsheetId: localStorage.getItem('sjst_sheets_spreadsheet_id') || TARGET_SPREADSHEET_ID,
