@@ -95,7 +95,7 @@ const GMAIL_SCOPES = [
 
 export function GmailAuthProvider({ children }: { children: React.ReactNode }) {
   const resolvedClientId = firebaseConfig.oAuthClientId || import.meta.env.VITE_GOOGLE_CLIENT_ID || '758652931874-r8ih7nbi6dnf7tb5a85ldiq6lf5a8jcf.apps.googleusercontent.com';
-
+    console.log("SJST GOOGLE CLIENT ID:", resolvedClientId);
   const [accessToken, setAccessToken] = useState<string | null>(() => {
     return sessionStorage.getItem('sjst_gmail_access_token') || localStorage.getItem('sjst_gmail_access_token') || null;
   });
