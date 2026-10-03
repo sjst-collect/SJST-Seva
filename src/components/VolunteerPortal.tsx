@@ -1102,7 +1102,7 @@ React.useEffect(() => {
         )}
         <button
           onClick={() => setActiveInternalTab('profile')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition shrink-0 cursor-pointer ${
             activeInternalTab === 'profile'
               ? 'bg-blue-600 text-white'
               : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
