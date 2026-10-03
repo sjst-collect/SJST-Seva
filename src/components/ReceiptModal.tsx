@@ -540,7 +540,7 @@ export function ReceiptModal({
               {/* REQUIREMENT 3: SUBTLE DEVELOPER BRANDING & COMPLIANCE FOOTER */}
               <div className="mt-2 pt-1.5 border-t border-slate-200 text-center space-y-0.5 font-sans">
                 <div className="text-[8px] text-slate-400">
-                  {trustConfig.section80G || 'All Donations exempt under Section 80G(5) of the Income Tax Act'} • Computer Generated Receipt
+                  {trustConfig.section80G || ''} • Computer Generated Receipt
                 </div>
                 <div className="text-[7.5px] text-slate-500 font-medium tracking-wide">
                   Powered by <span className="font-semibold text-slate-600">Digital Donation Management Solution</span> | Developed by <span className="font-semibold text-slate-700">Sachin Parab</span> | <span className="font-mono">9892805337</span>
