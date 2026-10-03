@@ -1013,8 +1013,55 @@ React.useEffect(() => {
         </div>
       </div>
 
-      {/* INTERNAL VOLUNTEER WORKBENCH NAVIGATION TABS */}
-      <div className="bg-white rounded-2xl p-1.5 shadow-xs border border-slate-200 flex items-center gap-1 overflow-x-auto">
+      {/* INTERNAL VOLUNTEER WORKBENCH NAVIGATION */}
+      
+      {/* MOBILE — DROPDOWN */}
+      <div className="sm:hidden bg-white rounded-2xl p-2 shadow-xs border border-slate-200">
+        <select
+          value={activeInternalTab}
+          onChange={(e) =>
+            setActiveInternalTab(
+              e.target.value as typeof activeInternalTab
+            )
+          }
+          className="w-full px-4 py-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-950 font-bold text-sm outline-none"
+        >
+          <option value="verify">
+            UPI Verification
+          </option>
+      
+          <option value="directEntry">
+            📝 Direct Counter Entry (Pre-Verified)
+          </option>
+      
+          <option value="detailedDashboard">
+            Detailed Dashboard
+          </option>
+      
+          <option value="liveSheet">
+            Live Sheet
+          </option>
+      
+          {!isVolunteer && !isTreasurer && (
+            <option value="emailConfig">
+              Email Config
+            </option>
+          )}
+      
+          {!isVolunteer && !isTreasurer && (
+            <option value="code">
+              Code & Setup
+            </option>
+          )}
+      
+          <option value="profile">
+            My Profile
+          </option>
+        </select>
+      </div>
+      
+      {/* DESKTOP — EXISTING TABS */}
+      <div className="hidden sm:flex bg-white rounded-2xl p-1.5 shadow-xs border border-slate-200 items-center gap-1">
         
         <button
           onClick={() => setActiveInternalTab('verify')}
