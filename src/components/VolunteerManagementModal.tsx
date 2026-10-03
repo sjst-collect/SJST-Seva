@@ -601,9 +601,151 @@ return (
                                 {verifiedCount} verified
                               </td>
               
-                              <td className="py-3.5 px-4 text-right">
-                                {/* KEEP YOUR EXISTING DESKTOP ACTION BUTTONS HERE */}
-                                {/* Do not change their logic. */}
+                             <td className="py-3.5 px-4 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    onClick={() => setEditingVolunteer({ ...vol })}
+                                    title="Edit Volunteer Details"
+                                    className="p-1.5 rounded-lg text-slate-600 hover:text-amber-900 hover:bg-amber-100 transition cursor-pointer"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                  </button>
+                                    {vol.status === 'Created' && (
+                                      <>
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          const result = await sendVolunteerActivation(vol.volunteerCode);
+
+                                          if (result.success) {
+                                            alert(`Activation link sent to ${vol.volunteerName}.`);
+                                          } else {
+                                            alert(
+                                              result.error ||
+                                              'Unable to send activation link.'
+                                            );
+                                          }
+                                        }}
+                                        title="Send Activation Link"
+                                        className="p-1.5 rounded-lg text-slate-600 hover:text-amber-900 hover:bg-amber-100 transition cursor-pointer"
+                                      >
+                                        <Send className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          const confirmed = window.confirm(
+                                            `Delete volunteer ${vol.volunteerName} (${vol.volunteerCode})?`
+                                          );
+
+                                          if (!confirmed) return;
+
+                                          const result = await deleteVolunteer(vol.volunteerCode);
+
+                                          if (result.success) {
+                                            alert(`Volunteer ${vol.volunteerName} deleted successfully.`);
+                                            await onRefreshVolunteers();
+                                          } else {
+                                            alert(
+                                              result.error ||
+                                              'Unable to delete volunteer.'
+                                            );
+                                          }
+                                        }}
+                                        title="Delete Volunteer"
+                                        className="p-1.5 rounded-lg text-slate-600 hover:text-rose-700 hover:bg-rose-100 transition cursor-pointer"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                      </>
+                                    )}
+
+
+                                  {vol.status === 'Active' && (
+                                    <>
+                                    <button
+                                      onClick={async () => {
+                                        const result = await sendVolunteerPinReset(
+                                          vol.volunteerCode
+                                        );
+
+                                        if (result.success) {
+                                          alert(`PIN reset link sent to ${vol.volunteerName}.`);
+                                        } else {
+                                          alert(
+                                            result.error ||
+                                            'Unable to send PIN reset link.'
+                                          );
+                                        }
+                                      }}
+                                      title="Reset Security PIN / Password"
+                                      className="p-1.5 rounded-lg text-slate-600 hover:text-amber-900 hover:bg-amber-100 transition cursor-pointer"
+                                    >
+                                      <KeyRound className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        const confirmed = window.confirm(
+                                          `Disable volunteer ${vol.volunteerName} (${vol.volunteerCode})?`
+                                        );
+
+                                        if (!confirmed) return;
+
+                                        const result = await disableVolunteer(vol.volunteerCode);
+
+                                        if (result.success) {
+                                          alert(`Volunteer ${vol.volunteerName} has been disabled.`);
+                                          await onRefreshVolunteers();
+                                        } else {
+                                          alert(
+                                            result.error ||
+                                            'Unable to disable volunteer.'
+                                          );
+                                        }
+                                      }}
+                                      title="Disable Volunteer"
+                                      className="text-slate-500 hover:text-rose-700 transition cursor-pointer"
+                                    >
+                                      <Ban className="w-3.5 h-3.5" />
+                                    </button>
+                                    </>
+                                  )}
+
+                                  {vol.status === 'Closed' && (
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      const confirmed = window.confirm(
+                                        `Reactivate volunteer ${vol.volunteerName} (${vol.volunteerCode})?`
+                                      );
+
+                                      if (!confirmed) return;
+
+                                      const result = await reactivateVolunteer(
+                                        vol.volunteerCode
+                                      );
+
+                                      if (result.success) {
+                                        alert(
+                                          `Volunteer ${vol.volunteerName} has been reactivated.`
+                                        );
+                                        await onRefreshVolunteers();
+                                      } else {
+                                        alert(
+                                          result.error ||
+                                          'Unable to reactivate volunteer.'
+                                        );
+                                      }
+                                    }}
+                                    title="Reactivate Volunteer"
+                                    className="p-1.5 rounded-lg text-slate-600 hover:text-emerald-700 hover:bg-emerald-100 transition cursor-pointer"
+                                  >
+                                    <RefreshCw className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                                </div>
+
                               </td>
                             </tr>
                           );
