@@ -279,8 +279,256 @@ return (
                 </select>
               </div>
 
-              {/* Volunteers Table */}
-              <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+              {/* Volunteers Roster */}
+
+              {/* MOBILE — CARD VIEW */}
+              <div className="sm:hidden space-y-3">
+                {loadingVolunteers ? (
+                  <div className="py-10 text-center text-sm font-semibold text-slate-500">
+                    ⏳ Loading Volunteers...
+                  </div>
+                ) : filteredVolunteers.length === 0 ? (
+                  <div className="py-8 text-center text-slate-400 text-xs">
+                    No volunteers found matching "{searchTerm}"
+                  </div>
+                ) : (
+                  filteredVolunteers.map(vol => {
+                    const verifiedCount = vol.verifiedSeva ?? 0;
+              
+                    return (
+                      <div
+                        key={vol.volunteerCode}
+                        className="border border-slate-200 rounded-2xl p-4 bg-white shadow-2xs"
+                      >
+                        {/* Top */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="font-mono font-bold text-amber-950 text-sm">
+                              {vol.volunteerCode}
+                            </div>
+              
+                            <div className="font-bold text-slate-900 mt-1">
+                              {vol.volunteerName}
+                            </div>
+                          </div>
+              
+                          <span
+                            className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                              vol.status === 'Active'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : vol.status === 'Created'
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-slate-100 text-slate-600'
+                            }`}
+                          >
+                            {vol.status}
+                          </span>
+                        </div>
+              
+                        {/* Contact */}
+                        {(vol.phone || vol.email) && (
+                          <div className="mt-3 space-y-1 text-[11px] text-slate-500">
+                            {vol.phone && (
+                              <div>📱 {vol.phone}</div>
+                            )}
+              
+                            {vol.email && (
+                              <div className="break-all">
+                                ✉️ {vol.email}
+                              </div>
+                            )}
+                          </div>
+                        )}
+              
+                        {/* Verified Seva */}
+                        <div className="mt-3 pt-3 border-t border-slate-100">
+                          <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500">
+                            Verified Seva
+                          </span>
+              
+                          <span className="ml-2 font-mono font-semibold text-slate-700 text-xs">
+                            {verifiedCount} verified
+                          </span>
+                        </div>
+              
+                        {/* Actions */}
+                        <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2">
+                          
+                          {/* Edit */}
+                          <button
+                            onClick={() => setEditingVolunteer({ ...vol })}
+                            title="Edit Volunteer Details"
+                            className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-slate-700 hover:text-amber-900 hover:bg-amber-50 transition cursor-pointer text-xs font-bold"
+                          >
+                            <span className="inline-flex items-center justify-center gap-1.5">
+                              <Edit3 className="w-3.5 h-3.5" />
+                              Edit
+                            </span>
+                          </button>
+              
+                          {/* Created */}
+                          {vol.status === 'Created' && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const result = await sendVolunteerActivation(
+                                    vol.volunteerCode
+                                  );
+              
+                                  if (result.success) {
+                                    alert(
+                                      `Activation link sent to ${vol.volunteerName}.`
+                                    );
+                                  } else {
+                                    alert(
+                                      result.error ||
+                                      'Unable to send activation link.'
+                                    );
+                                  }
+                                }}
+                                title="Send Activation Link"
+                                className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:text-amber-900 hover:bg-amber-50 transition cursor-pointer"
+                              >
+                                <Send className="w-4 h-4" />
+                              </button>
+              
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const confirmed = window.confirm(
+                                    `Delete volunteer ${vol.volunteerName} (${vol.volunteerCode})?`
+                                  );
+              
+                                  if (!confirmed) return;
+              
+                                  const result = await deleteVolunteer(
+                                    vol.volunteerCode
+                                  );
+              
+                                  if (result.success) {
+                                    alert(
+                                      `Volunteer ${vol.volunteerName} deleted successfully.`
+                                    );
+                                    await onRefreshVolunteers();
+                                  } else {
+                                    alert(
+                                      result.error ||
+                                      'Unable to delete volunteer.'
+                                    );
+                                  }
+                                }}
+                                title="Delete Volunteer"
+                                className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:text-rose-700 hover:bg-rose-50 transition cursor-pointer"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+              
+                          {/* Active */}
+                          {vol.status === 'Active' && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const result = await sendVolunteerPinReset(
+                                    vol.volunteerCode
+                                  );
+              
+                                  if (result.success) {
+                                    alert(
+                                      `PIN reset link sent to ${vol.volunteerName}.`
+                                    );
+                                  } else {
+                                    alert(
+                                      result.error ||
+                                      'Unable to send PIN reset link.'
+                                    );
+                                  }
+                                }}
+                                title="Reset Security PIN / Password"
+                                className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:text-amber-900 hover:bg-amber-50 transition cursor-pointer"
+                              >
+                                <KeyRound className="w-4 h-4" />
+                              </button>
+              
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const confirmed = window.confirm(
+                                    `Disable volunteer ${vol.volunteerName} (${vol.volunteerCode})?`
+                                  );
+              
+                                  if (!confirmed) return;
+              
+                                  const result = await disableVolunteer(
+                                    vol.volunteerCode
+                                  );
+              
+                                  if (result.success) {
+                                    alert(
+                                      `Volunteer ${vol.volunteerName} has been disabled.`
+                                    );
+                                    await onRefreshVolunteers();
+                                  } else {
+                                    alert(
+                                      result.error ||
+                                      'Unable to disable volunteer.'
+                                    );
+                                  }
+                                }}
+                                title="Disable Volunteer"
+                                className="p-2 rounded-xl border border-slate-200 text-slate-500 hover:text-rose-700 hover:bg-rose-50 transition cursor-pointer"
+                              >
+                                <Ban className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+              
+                          {/* Closed */}
+                          {vol.status === 'Closed' && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const confirmed = window.confirm(
+                                  `Reactivate volunteer ${vol.volunteerName} (${vol.volunteerCode})?`
+                                );
+              
+                                if (!confirmed) return;
+              
+                                const result = await reactivateVolunteer(
+                                  vol.volunteerCode
+                                );
+              
+                                if (result.success) {
+                                  alert(
+                                    `Volunteer ${vol.volunteerName} has been reactivated.`
+                                  );
+                                  await onRefreshVolunteers();
+                                } else {
+                                  alert(
+                                    result.error ||
+                                    'Unable to reactivate volunteer.'
+                                  );
+                                }
+                              }}
+                              title="Reactivate Volunteer"
+                              className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 transition cursor-pointer"
+                            >
+                              <RefreshCw className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              
+              
+              {/* DESKTOP — EXISTING TABLE */}
+              <div className="hidden sm:block border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
                 <div className="overflow-x-auto max-h-[380px]">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-100 text-slate-600 font-bold uppercase text-[10px] tracking-wider sticky top-0">
@@ -292,6 +540,7 @@ return (
                         <th className="py-3 px-4 text-right">Actions</th>
                       </tr>
                     </thead>
+              
                     <tbody className="divide-y divide-slate-100 font-normal">
                       {loadingVolunteers ? (
                         <tr>
@@ -303,25 +552,31 @@ return (
                         </tr>
                       ) : filteredVolunteers.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="py-8 text-center text-slate-400 text-xs">
-                            No volunteers found matching &quot;{searchTerm}&quot;
+                          <td
+                            colSpan={5}
+                            className="py-8 text-center text-slate-400 text-xs"
+                          >
+                            No volunteers found matching "{searchTerm}"
                           </td>
                         </tr>
                       ) : (
                         filteredVolunteers.map(vol => {
-                          if (vol.volunteerCode === 'VOL001') {
-                           
-                          }
-                          
                           const verifiedCount = vol.verifiedSeva ?? 0;
-                          
+              
                           return (
-                            <tr key={vol.volunteerCode} className="hover:bg-amber-50/40 transition">
+                            <tr
+                              key={vol.volunteerCode}
+                              className="hover:bg-amber-50/40 transition"
+                            >
                               <td className="py-3.5 px-4 font-mono font-bold text-amber-950">
                                 {vol.volunteerCode}
                               </td>
+              
                               <td className="py-3.5 px-4">
-                                <div className="font-bold text-slate-900">{vol.volunteerName}</div>
+                                <div className="font-bold text-slate-900">
+                                  {vol.volunteerName}
+                                </div>
+              
                                 {(vol.phone || vol.email) && (
                                   <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-2">
                                     {vol.phone && <span>📱 {vol.phone}</span>}
@@ -329,163 +584,26 @@ return (
                                   </div>
                                 )}
                               </td>
+              
                               <td className="py-3.5 px-4">
-                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                                  vol.status === 'Active'
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : 'bg-slate-100 text-slate-600'
-                                }`}>
+                                <span
+                                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                    vol.status === 'Active'
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : 'bg-slate-100 text-slate-600'
+                                  }`}
+                                >
                                   {vol.status}
                                 </span>
                               </td>
+              
                               <td className="py-3.5 px-4 font-mono text-slate-700 font-medium">
                                 {verifiedCount} verified
                               </td>
+              
                               <td className="py-3.5 px-4 text-right">
-                                <div className="flex items-center justify-end gap-1.5">
-                                  <button
-                                    onClick={() => setEditingVolunteer({ ...vol })}
-                                    title="Edit Volunteer Details"
-                                    className="p-1.5 rounded-lg text-slate-600 hover:text-amber-900 hover:bg-amber-100 transition cursor-pointer"
-                                  >
-                                    <Edit3 className="w-3.5 h-3.5" />
-                                  </button>
-                                    {vol.status === 'Created' && (
-                                      <>
-                                      <button
-                                        type="button"
-                                        onClick={async () => {
-                                          const result = await sendVolunteerActivation(vol.volunteerCode);
-
-                                          if (result.success) {
-                                            alert(`Activation link sent to ${vol.volunteerName}.`);
-                                          } else {
-                                            alert(
-                                              result.error ||
-                                              'Unable to send activation link.'
-                                            );
-                                          }
-                                        }}
-                                        title="Send Activation Link"
-                                        className="p-1.5 rounded-lg text-slate-600 hover:text-amber-900 hover:bg-amber-100 transition cursor-pointer"
-                                      >
-                                        <Send className="w-3.5 h-3.5" />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={async () => {
-                                          const confirmed = window.confirm(
-                                            `Delete volunteer ${vol.volunteerName} (${vol.volunteerCode})?`
-                                          );
-
-                                          if (!confirmed) return;
-
-                                          const result = await deleteVolunteer(vol.volunteerCode);
-
-                                          if (result.success) {
-                                            alert(`Volunteer ${vol.volunteerName} deleted successfully.`);
-                                            await onRefreshVolunteers();
-                                          } else {
-                                            alert(
-                                              result.error ||
-                                              'Unable to delete volunteer.'
-                                            );
-                                          }
-                                        }}
-                                        title="Delete Volunteer"
-                                        className="p-1.5 rounded-lg text-slate-600 hover:text-rose-700 hover:bg-rose-100 transition cursor-pointer"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
-                                      </>
-                                    )}
-
-
-                                  {vol.status === 'Active' && (
-                                    <>
-                                    <button
-                                      onClick={async () => {
-                                        const result = await sendVolunteerPinReset(
-                                          vol.volunteerCode
-                                        );
-
-                                        if (result.success) {
-                                          alert(`PIN reset link sent to ${vol.volunteerName}.`);
-                                        } else {
-                                          alert(
-                                            result.error ||
-                                            'Unable to send PIN reset link.'
-                                          );
-                                        }
-                                      }}
-                                      title="Reset Security PIN / Password"
-                                      className="p-1.5 rounded-lg text-slate-600 hover:text-amber-900 hover:bg-amber-100 transition cursor-pointer"
-                                    >
-                                      <KeyRound className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={async () => {
-                                        const confirmed = window.confirm(
-                                          `Disable volunteer ${vol.volunteerName} (${vol.volunteerCode})?`
-                                        );
-
-                                        if (!confirmed) return;
-
-                                        const result = await disableVolunteer(vol.volunteerCode);
-
-                                        if (result.success) {
-                                          alert(`Volunteer ${vol.volunteerName} has been disabled.`);
-                                          await onRefreshVolunteers();
-                                        } else {
-                                          alert(
-                                            result.error ||
-                                            'Unable to disable volunteer.'
-                                          );
-                                        }
-                                      }}
-                                      title="Disable Volunteer"
-                                      className="text-slate-500 hover:text-rose-700 transition cursor-pointer"
-                                    >
-                                      <Ban className="w-3.5 h-3.5" />
-                                    </button>
-                                    </>
-                                  )}
-
-                                  {vol.status === 'Closed' && (
-                                  <button
-                                    type="button"
-                                    onClick={async () => {
-                                      const confirmed = window.confirm(
-                                        `Reactivate volunteer ${vol.volunteerName} (${vol.volunteerCode})?`
-                                      );
-
-                                      if (!confirmed) return;
-
-                                      const result = await reactivateVolunteer(
-                                        vol.volunteerCode
-                                      );
-
-                                      if (result.success) {
-                                        alert(
-                                          `Volunteer ${vol.volunteerName} has been reactivated.`
-                                        );
-                                        await onRefreshVolunteers();
-                                      } else {
-                                        alert(
-                                          result.error ||
-                                          'Unable to reactivate volunteer.'
-                                        );
-                                      }
-                                    }}
-                                    title="Reactivate Volunteer"
-                                    className="p-1.5 rounded-lg text-slate-600 hover:text-emerald-700 hover:bg-emerald-100 transition cursor-pointer"
-                                  >
-                                    <RefreshCw className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
-                                </div>
-
+                                {/* KEEP YOUR EXISTING DESKTOP ACTION BUTTONS HERE */}
+                                {/* Do not change their logic. */}
                               </td>
                             </tr>
                           );
