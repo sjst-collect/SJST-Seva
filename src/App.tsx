@@ -108,19 +108,40 @@ class AppErrorBoundary extends React.Component<
   }
 }
 function App() {
-const [trustConfig, setTrustConfig] = useState<TrustConfig>(() => {
-      const saved = localStorage.getItem('sjst_trust_config');
-      return saved ? JSON.parse(saved) : {
-        name: 'Shree Jagannath Seva Trust',
-        tagline: 'Devotion & Service',
-        email: 'shreejagannathsevatrust.thane@gmail.com',
-        phone: '',
-        address: '',
-        upiId: '',
-        gstin: '',
-        trustRegNo: ''
-      };
-    });
+  const [trustConfig, setTrustConfig] = useState<TrustConfig>(() => {
+    const saved = localStorage.getItem('sjst_trust_config');
+  
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+  
+        return {
+          ...TRUST_CONFIG,
+          ...parsed,
+  
+          // Use current configured values when old localStorage
+          // contains blank or missing payment details.
+          bankName: parsed.bankName || TRUST_CONFIG.bankName,
+          accountName: parsed.accountName || TRUST_CONFIG.accountName,
+          accountNo: parsed.accountNo || TRUST_CONFIG.accountNo,
+          ifsc: parsed.ifsc || TRUST_CONFIG.ifsc,
+          branch: parsed.branch || TRUST_CONFIG.branch,
+          upiId: parsed.upiId || TRUST_CONFIG.upiId,
+  
+          regdNo: parsed.regdNo || TRUST_CONFIG.regdNo,
+          receiptsFolderId:
+            parsed.receiptsFolderId || TRUST_CONFIG.receiptsFolderId
+        };
+      } catch (error) {
+        console.error(
+          'Unable to load saved Trust Configuration:',
+          error
+        );
+      }
+    }
+  
+    return TRUST_CONFIG;
+  });
 
 
   const [donations, setDonations] = useState<DonationRecord[]>(() => {
