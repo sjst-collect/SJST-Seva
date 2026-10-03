@@ -139,7 +139,7 @@ export function ReceiptModal({
       const dataUrl = await toPng(element, {
         quality: 0.98,
         pixelRatio: 3,
-        backgroundColor: '#ffffff',
+        backgroundColor: '#FFF3E0',
         cacheBust: true,
       });
 
@@ -343,14 +343,14 @@ export function ReceiptModal({
           <div 
             ref={receiptRef} 
             id="compact-digital-receipt"
-            className="w-full max-w-[794px] bg-[#fffefb] text-slate-900 relative selection:bg-amber-100 border border-amber-900/30 shadow-md print:shadow-none print:border-amber-900/40 print:w-[210mm] print:h-[105mm] print:max-w-none"
+            className="w-full max-w-[794px] bg-[#FFF3E0] text-slate-900 relative selection:bg-amber-100 border border-amber-900/30 shadow-md print:shadow-none print:border-amber-900/40 print:w-[210mm] print:h-[105mm] print:max-w-none""
             style={{ 
               fontFamily: "Georgia, Cambria, 'Times New Roman', serif",
               boxSizing: 'border-box'
             }}
           >
             {/* Double Border Frame */}
-            <div className="p-3.5 sm:p-4.5 border-2 border-amber-900/60 m-1 rounded-sm bg-white relative overflow-hidden">
+            <div className="p-3.5 sm:p-4.5 border-2 border-amber-900/60 m-1 rounded-sm bg-[#FFF3E0] relative overflow-hidden">
               
               {/* Divine Maa Durga Watermark behind the receipt content */}
               <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-0 overflow-hidden">
