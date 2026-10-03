@@ -188,8 +188,8 @@ export function VolunteerManagementModal({
 
 return (
     <>
-    <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-6">
+    <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-hidden">
+      <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-2 sm:my-6 flex flex-col max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-3rem)]">
         
         {/* Header */}
         <div className="bg-gradient-to-r from-amber-900 to-amber-950 text-white p-5 sm:p-6 flex items-center justify-between">
@@ -244,7 +244,7 @@ return (
         </div>
 
         {/* Modal Body */}
-        <div className="p-6">
+        <div className="p-6 flex-1 min-h-0 overflow-y-auto overscroll-contain">
           
           {/* TAB: LIST VOLUNTEERS */}
           {activeTab === 'list' && !editingVolunteer && (
