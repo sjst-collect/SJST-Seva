@@ -54,6 +54,8 @@ export function ReceiptModal({
   const [confirmSuccessMsg, setConfirmSuccessMsg] = useState<string | null>(null);
   const [confirmErrorMsg, setConfirmErrorMsg] = useState<string | null>(null);
 
+  const autoReceiptProcessedRef = useRef<string | null>(null);
+  
   // Sync prop changes
   useEffect(() => {
     setCurrentDonation(initialDonation);
@@ -127,6 +129,41 @@ export function ReceiptModal({
     }
   };
 
+const uploadReceiptPdfToBackend = async (
+  pdf: jsPDF,
+  fileName: string
+) => {
+  const pdfDataUri = pdf.output('datauristring');
+
+  const base64 = pdfDataUri.split(',')[1];
+
+  const response = await fetch(
+    'YOUR_EXISTING_GOOGLE_APPS_SCRIPT_WEB_APP_URL',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
+      body: JSON.stringify({
+        action: 'save_client_receipt_pdf',
+        donationId: currentDonation.donationId,
+        fileName,
+        pdfBase64: base64
+      })
+    }
+  );
+
+  const result = await response.json();
+
+  if (!result.success) {
+    throw new Error(
+      result.error || 'Unable to save receipt PDF to Google Drive.'
+    );
+  }
+
+  return result;
+};
+  
   // Real Native PDF Generation in 210mm x 105mm Custom Compact Landscape Receipt Format
   const handleDownloadPdf = async () => {
     if (!receiptRef.current) return;
@@ -181,8 +218,16 @@ export function ReceiptModal({
         ? `SJST_Provisional_Receipt_${currentDonation.donationId}.pdf`
         : `SJST_Official_Receipt_${currentDonation.donationId}.pdf`;
 
-      pdf.save(fileName);
-
+      const backendResult = await uploadReceiptPdfToBackend(
+        pdf,
+        fileName
+      );
+      
+      console.log(
+        'Receipt PDF saved to Drive:',
+        backendResult.receiptUrl
+      );
+      
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 3000);
     } catch (err) {
@@ -193,6 +238,75 @@ export function ReceiptModal({
       setIsGeneratingPdf(false);
     }
   };
+
+  const handleAutoSaveReceiptPdf = async () => {
+  if (!currentDonation) return;
+
+  try {
+    const receiptElement = document.getElementById(
+      'compact-digital-receipt'
+    );
+
+    if (!receiptElement) {
+      console.error('Receipt element not found.');
+      return;
+    }
+
+    // Give the browser time to finish rendering
+    // logo, watermark and receipt content.
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    const dataUrl = await toPng(receiptElement, {
+      pixelRatio: 2,
+      cacheBust: true,
+      backgroundColor: '#FFF3E0'
+    });
+
+    const img = new Image();
+
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
+
+    const pdf = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: [210, 105]
+    });
+
+    pdf.addImage(
+      img,
+      'PNG',
+      0,
+      0,
+      210,
+      105
+    );
+
+    const fileName =
+      `SJST_Official_Receipt_${currentDonation.donationId}.pdf`;
+
+    const backendResult =
+      await uploadReceiptPdfToBackend(
+        pdf,
+        fileName
+      );
+
+    console.log(
+      'Official receipt automatically saved:',
+      backendResult.receiptUrl
+    );
+
+  } catch (error) {
+    console.error(
+      'Automatic receipt PDF generation failed:',
+      error
+    );
+  }
+};
+  
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white">
