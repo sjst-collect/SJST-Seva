@@ -398,46 +398,71 @@ const uploadReceiptPdfToBackend = async (
   };
 
   useEffect(() => {
-  
-    if (!currentDonation) {
-      return;
+
+  if (!currentDonation) {
+    return;
+  }
+
+  // Only generate official receipts for Paid donations.
+  if (currentDonation.paymentStatus !== 'Paid') {
+    return;
+  }
+
+  // If a receipt already exists, Code.gs has already handled
+  // the existing Drive PDF / email workflow.
+  if (currentDonation.receiptUrl) {
+    return;
+  }
+
+  // Prevent duplicate processing while this receipt is being generated.
+  if (
+    autoReceiptProcessedRef.current ===
+    currentDonation.donationId
+  ) {
+    return;
+  }
+
+  const timer = setTimeout(async () => {
+
+    try {
+
+      await handleAutoSaveReceiptPdf();
+
+      // Mark as processed ONLY after successful completion.
+      autoReceiptProcessedRef.current =
+        currentDonation.donationId;
+
+      setConfirmSuccessMsg(
+        '🎉 Offering confirmed & verified! Official Receipt generated and emailed successfully.'
+      );
+
+    } catch (error) {
+
+      console.error(
+        'AUTOMATIC RECEIPT PROCESSING ERROR:',
+        error
+      );
+
+      // Allow retry if PDF generation/upload/email fails.
+      autoReceiptProcessedRef.current = null;
+
+      setConfirmErrorMsg(
+        error instanceof Error
+          ? error.message
+          : 'Unable to generate and email the official receipt.'
+      );
+
     }
-  
-    // Only official Paid receipts.
-    if (currentDonation.paymentStatus !== 'Paid') {
-      return;
-    }
-  
-    // Receipt already exists.
-    // Backend has already handled Drive/email logic.
-    if (currentDonation.receiptUrl) {
-      return;
-    }
-  
-    // Prevent duplicate generation for the same donation.
-    if (
-      autoReceiptProcessedRef.current ===
-      currentDonation.donationId
-    ) {
-      return;
-    }
-  
-    autoReceiptProcessedRef.current =
-      currentDonation.donationId;
-  
-    const timer = setTimeout(() => {
-  
-      handleAutoSaveReceiptPdf();
-  
-    }, 700);
-  
-    return () => clearTimeout(timer);
-  
-  }, [
-    currentDonation.donationId,
-    currentDonation.paymentStatus,
-    currentDonation.receiptUrl
-  ]);
+
+  }, 700);
+
+  return () => clearTimeout(timer);
+
+}, [
+  currentDonation?.donationId,
+  currentDonation?.paymentStatus,
+  currentDonation?.receiptUrl
+]);
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white">
