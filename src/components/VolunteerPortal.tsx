@@ -462,15 +462,28 @@ React.useEffect(() => {
       clean,
       `${currentVolunteer.volunteerName} (${currentVolunteer.volunteerCode})`
     );
-
+    
     setVerifyResult(result);
-
+    
     if (result.success) {
       setInputCode('');
-
+    
       setLivePendingQueue(prev =>
         prev.filter(item => item.confirmationCode !== clean)
       );
+    
+      // ---------------------------------------------------------
+      // AUTOMATIC OFFICIAL RECEIPT WORKFLOW
+      // Open the receipt modal immediately after verification.
+      // ReceiptModal will then:
+      // 1. Render the online receipt
+      // 2. Generate PDF
+      // 3. Upload PDF to Google Drive
+      // 4. Email the exact same PDF to donor
+      // ---------------------------------------------------------
+      if (result.donation) {
+        onViewReceipt(result.donation);
+      }
     }
 
   } catch (err: any) {
