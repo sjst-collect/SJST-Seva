@@ -517,84 +517,118 @@ const uploadReceiptPdfToBackend = async (
   };
 
  useEffect(() => {
-
-  if (!currentDonation) {
-    return;
-  }
-
-  // Only official Paid receipts.
-  if (currentDonation.paymentStatus !== 'Paid') {
-    return;
-  }
-
-  // Receipt already exists.
-  // Do not generate another PDF.
-  if (currentDonation.receiptUrl) {
-    console.log(
-      'AUTO RECEIPT: Existing receipt found. Skipping generation.'
-    );
-
-    return;
-  }
-
-  // Prevent duplicate processing.
-  if (
-    autoReceiptProcessedRef.current ===
-    currentDonation.donationId
-  ) {
-    return;
-  }
-
-  console.log(
-    'AUTO RECEIPT: Paid donation detected:',
-    currentDonation.donationId
-  );
-
-  const timer = setTimeout(async () => {
-
-    try {
-
-      await handleAutoSaveReceiptPdf();
-
-      // Mark as processed ONLY after the complete
-      // Drive + email workflow succeeds.
-      autoReceiptProcessedRef.current =
-        currentDonation.donationId;
-
-      setConfirmSuccessMsg(
-        '🎉 Offering confirmed & verified! Official Receipt generated, saved and emailed successfully.'
+    if (!currentDonation) return;
+  
+    // Only automatic processing for Paid donations.
+    if (currentDonation.paymentStatus !== 'Paid') return;
+  
+    // Existing receipt = do not generate another PDF.
+    if (currentDonation.receiptUrl) {
+      console.log(
+        'AUTO RECEIPT: Existing receipt found. No new PDF required.'
       );
-
-    } catch (error) {
-
-      console.error(
-        'AUTO RECEIPT WORKFLOW FAILED:',
-        error
-      );
-
-      // Allow another attempt if something failed.
-      autoReceiptProcessedRef.current = null;
-
-      setConfirmErrorMsg(
-        error instanceof Error
-          ? error.message
-          : 'Unable to generate, save and email the official receipt.'
-      );
-
+      return;
     }
-
-  }, 1200);
-
-  return () => {
-    clearTimeout(timer);
-  };
-
-}, [
-  currentDonation?.donationId,
-  currentDonation?.paymentStatus,
-  currentDonation?.receiptUrl
-]);
-
+  
+    // Already successfully processed.
+    if (
+      autoReceiptProcessedRef.current ===
+      currentDonation.donationId
+    ) {
+      return;
+    }
+  
+    let cancelled = false;
+    let attempts = 0;
+  
+    const tryAutomaticReceipt = async () => {
+      // Maximum ~10 seconds waiting for receipt to render.
+      if (cancelled || attempts >= 20) {
+        console.error(
+          'AUTO RECEIPT: Receipt did not become ready.'
+        );
+        return;
+      }
+  
+      attempts++;
+  
+      const receiptElement = document.getElementById(
+        'compact-digital-receipt'
+      );
+  
+      // Receipt has not mounted yet.
+      // Keep trying — DO NOT give up.
+      if (!receiptElement) {
+        setTimeout(tryAutomaticReceipt, 500);
+        return;
+      }
+  
+      // Prevent duplicate processing.
+      if (
+        autoReceiptProcessedRef.current ===
+        currentDonation.donationId
+      ) {
+        return;
+      }
+  
+      try {
+        console.log(
+          'AUTO RECEIPT: Receipt is ready. Starting automatic PDF workflow.'
+        );
+  
+        const success =
+          await handleAutoSaveReceiptPdf();
+  
+        if (cancelled) return;
+  
+        if (success) {
+          // Mark ONLY after PDF + Drive + Email succeeded.
+          autoReceiptProcessedRef.current =
+            currentDonation.donationId;
+  
+          setConfirmSuccessMsg(
+            '🎉 Offering confirmed & verified! Official Receipt generated, saved to Drive and emailed successfully.'
+          );
+  
+          console.log(
+            'AUTO RECEIPT: COMPLETE — PDF saved to Drive and email sent.'
+          );
+        }
+  
+      } catch (error) {
+  
+        console.error(
+          'AUTO RECEIPT: Automatic workflow failed:',
+          error
+        );
+  
+        autoReceiptProcessedRef.current = null;
+  
+        setConfirmErrorMsg(
+          error instanceof Error
+            ? error.message
+            : 'Unable to generate, save and email the official receipt.'
+        );
+      }
+    };
+  
+    // Give React one render cycle before starting.
+    const timer = setTimeout(
+      tryAutomaticReceipt,
+      500
+    );
+  
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  
+  }, [
+    currentDonation?.donationId,
+    currentDonation?.paymentStatus,
+    currentDonation?.receiptUrl
+  ]);
+    
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white">
       <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full overflow-hidden border border-slate-200 my-auto animate-in fade-in zoom-in-95 duration-150 print:border-none print:shadow-none print:max-w-none print:w-full print:rounded-none">
