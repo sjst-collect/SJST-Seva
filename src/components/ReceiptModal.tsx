@@ -163,81 +163,157 @@ const uploadReceiptPdfToBackend = async (
 
   return result;
 };
+
+  const waitForReceiptAssets = async (
+    element: HTMLElement
+  ): Promise<void> => {
+    // Wait for the browser to finish the current render cycle.
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => resolve())
+      )
+    );
   
+    // Wait for all normal <img> elements.
+    const images = Array.from(
+      element.querySelectorAll('img')
+    );
+  
+    await Promise.all(
+      images.map((img) => {
+        if (img.complete && img.naturalWidth > 0) {
+          return Promise.resolve();
+        }
+  
+        return new Promise<void>((resolve) => {
+          const done = () => {
+            img.removeEventListener('load', done);
+            img.removeEventListener('error', done);
+            resolve();
+          };
+  
+          img.addEventListener('load', done);
+          img.addEventListener('error', done);
+        });
+      })
+    );
+  
+    // Give inline SVG / CSS rendering one final browser cycle.
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => resolve())
+      )
+    );
+  };
   // Real Native PDF Generation in 210mm x 105mm Custom Compact Landscape Receipt Format
   const handleDownloadPdf = async () => {
-    if (!receiptRef.current) return;
-    setIsGeneratingPdf(true);
+  if (!receiptRef.current) return;
 
-    try {
-      const element = receiptRef.current;
-      
-      // Capture element at high DPI (pixelRatio 3 for razor-sharp typography and vector-like clarity)
-      const dataUrl = await toPng(element, {
-        quality: 0.98,
-        pixelRatio: 3,
-        backgroundColor: '#FFF3E0',
-        cacheBust: true,
-      });
+  setIsGeneratingPdf(true);
 
-      // Initialize jsPDF with custom compact landscape dimensions (210mm x 105mm)
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: [210, 105],
-      });
+  try {
+    const element = receiptRef.current;
 
-      const img = new Image();
-      img.src = dataUrl;
-      await new Promise((resolve) => {
-        img.onload = resolve;
-      });
+    // Wait for logo, watermark, SVG and fonts to finish rendering.
+    await waitForReceiptAssets(element);
 
-      const pageWidth = 210;
-      const pageHeight = 105;
-      
-      // Calculate aspect-ratio fitted dimensions with 3mm safety margins
-      const margin = 3;
-      const availableWidth = pageWidth - (margin * 2);
-      const availableHeight = pageHeight - (margin * 2);
+    const dataUrl = await toPng(element, {
+      quality: 0.98,
+      pixelRatio: 3,
+      backgroundColor: '#FFF3E0',
+      cacheBust: true,
+      skipFonts: false,
+    });
 
-      let renderWidth = availableWidth;
-      let renderHeight = (img.height * renderWidth) / img.width;
+    const pdf = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: [210, 105],
+    });
 
-      if (renderHeight > availableHeight) {
-        renderHeight = availableHeight;
-        renderWidth = (img.width * renderHeight) / img.height;
-      }
+    const img = new Image();
+    img.src = dataUrl;
 
-      const xPos = margin + (availableWidth - renderWidth) / 2;
-      const yPos = margin + (availableHeight - renderHeight) / 2;
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () =>
+        reject(new Error('Receipt image could not be loaded.'));
+    });
 
-      pdf.addImage(dataUrl, 'PNG', xPos, yPos, renderWidth, renderHeight, undefined, 'FAST');
+    const pageWidth = 210;
+    const pageHeight = 105;
 
-      const fileName = isPending
-        ? `SJST_Provisional_Receipt_${currentDonation.donationId}.pdf`
-        : `SJST_Official_Receipt_${currentDonation.donationId}.pdf`;
+    const margin = 3;
+    const availableWidth = pageWidth - margin * 2;
+    const availableHeight = pageHeight - margin * 2;
 
-      const backendResult = await uploadReceiptPdfToBackend(
+    let renderWidth = availableWidth;
+    let renderHeight =
+      (img.height * renderWidth) / img.width;
+
+    if (renderHeight > availableHeight) {
+      renderHeight = availableHeight;
+      renderWidth =
+        (img.width * renderHeight) / img.height;
+    }
+
+    const xPos =
+      margin +
+      (availableWidth - renderWidth) / 2;
+
+    const yPos =
+      margin +
+      (availableHeight - renderHeight) / 2;
+
+    pdf.addImage(
+      dataUrl,
+      'PNG',
+      xPos,
+      yPos,
+      renderWidth,
+      renderHeight,
+      undefined,
+      'FAST'
+    );
+
+    const fileName = isPending
+      ? `SJST_Provisional_Receipt_${currentDonation.donationId}.pdf`
+      : `SJST_Official_Receipt_${currentDonation.donationId}.pdf`;
+
+    const backendResult =
+      await uploadReceiptPdfToBackend(
         pdf,
         fileName
       );
-      
-      console.log(
-        'Receipt PDF saved to Drive:',
-        backendResult.receiptUrl
-      );
-      
-      setDownloadSuccess(true);
-      setTimeout(() => setDownloadSuccess(false), 3000);
-    } catch (err) {
-      console.error('Error generating PDF:', err);
-      alert('Unable to generate PDF automatically. Opening print preview for direct PDF saving.');
-      window.print();
-    } finally {
-      setIsGeneratingPdf(false);
-    }
-  };
+
+    console.log(
+      'Receipt PDF saved to Drive:',
+      backendResult.receiptUrl
+    );
+
+    setDownloadSuccess(true);
+
+    setTimeout(
+      () => setDownloadSuccess(false),
+      3000
+    );
+
+  } catch (err) {
+
+    console.error(
+      'Error generating PDF:',
+      err
+    );
+
+    alert(
+      'Unable to generate receipt PDF.'
+    );
+
+  } finally {
+
+    setIsGeneratingPdf(false);
+  }
+};
 
   const handleAutoSaveReceiptPdf = async () => {
   if (!currentDonation) return;
