@@ -95,10 +95,15 @@ export function ReceiptModal({
     try {
       const code = currentDonation.confirmationCode || currentDonation.donationId;
       const res = await onVerifyDonation(code, selectedVolunteer);
-
-      if (res.success && res.donation) {
-        setCurrentDonation(res.donation);
-      } else {
+    
+    if (res.success && res.donation) {
+      setDirectSuccessDonation(res.donation);
+    
+      // Automatically open the receipt after successful verification.
+      // This mounts ReceiptModal, which triggers the automatic
+      // PDF → Drive → Email workflow.
+      setModalReceiptDonation(res.donation);
+    } else {
         setConfirmErrorMsg(res.error || 'Failed to verify donation.');
       }
     } catch (e: any) {
