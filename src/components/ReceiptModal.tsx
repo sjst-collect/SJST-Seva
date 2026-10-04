@@ -98,7 +98,6 @@ export function ReceiptModal({
 
       if (res.success && res.donation) {
         setCurrentDonation(res.donation);
-        setConfirmSuccessMsg('🎉 Offering confirmed & verified! Official Receipt generated.');
       } else {
         setConfirmErrorMsg(res.error || 'Failed to verify donation.');
       }
