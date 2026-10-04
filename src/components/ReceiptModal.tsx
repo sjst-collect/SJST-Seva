@@ -138,7 +138,7 @@ const uploadReceiptPdfToBackend = async (
   const base64 = pdfDataUri.split(',')[1];
 
   const response = await fetch(
-    'YOUR_EXISTING_GOOGLE_APPS_SCRIPT_WEB_APP_URL',
+    'https://script.google.com/macros/s/AKfycbyqpWTtvnZgmX1aN_atWUvH1fAeq8uwpYC0Zl-QrulToG-jtGYwNsA6xjkicRkia99xIg/exec',
     {
       method: 'POST',
       headers: {
