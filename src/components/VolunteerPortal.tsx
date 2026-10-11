@@ -44,6 +44,7 @@ interface VolunteerPortalProps {
   trustConfig: TrustConfig;
   onVerifyDonation: (
     confirmationCode: string,
+    volunteerCode: string,
     volunteerName: string
   ) => Promise<{ success: boolean; donation?: DonationRecord; error?: string }>;
   onDirectDonationSubmit?: (formData: {
@@ -57,7 +58,15 @@ interface VolunteerPortalProps {
     volunteerCode: string;
   }) => Promise<DonationRecord>;
   onViewReceipt: (donation: DonationRecord) => void;
-  onConfirmDonationFromSheet?: (donationId: string, volunteerName: string) => void;
+  onConfironConfirmDonationFromSheet?: (
+  donationId: string,
+  volunteerCode: string,
+  volunteerName: string
+) => Promise<{
+  success: boolean;
+  donation?: DonationRecord;
+  error?: string;
+}>;
   onSendReceipt?: (donation: DonationRecord) => Promise<void>;
   onRepayment?: (donation: DonationRecord) => Promise<void>;
   onConfirmRepayment?: (donation: DonationRecord) => Promise<void>;
@@ -409,6 +418,21 @@ React.useEffect(() => {
         });
 
         setDirectSuccessDonation(record);
+
+        // ---------------------------------------------------------
+        // STANDARD RECEIPT WORKFLOW
+        // Direct donations are already Paid and therefore do not
+        // require confirmation-code verification.
+        //
+        // Automatically open the same ReceiptModal used by the
+        // donor + confirmation-code workflow.
+        // ReceiptModal will:
+        // 1. Render receipt
+        // 2. Generate PDF
+        // 3. Save PDF to Drive
+        // 4. Email the same PDF
+        // ---------------------------------------------------------
+        onViewReceipt(record);
         // Reset form for next devotee
         setDirectDonorName('');
         setDirectEmail('');
@@ -459,8 +483,9 @@ React.useEffect(() => {
     // SINGLE verification path:
     // VolunteerPortal -> App.tsx -> Google Apps Script
     const result = await onVerifyDonation(
-      clean,
-      `${currentVolunteer.volunteerName} (${currentVolunteer.volunteerCode})`
+        clean,
+        currentVolunteer.volunteerCode,
+        currentVolunteer.volunteerName
     );
     
     setVerifyResult(result);
@@ -714,7 +739,7 @@ React.useEffect(() => {
           {/* Frame Watermark - visible only inside the login frame */}
           <div className="absolute inset-0 pointer-events-none overflow-hidden">
             <img
-              src="/Contributions/images/Watermark.jpeg"
+              src={`${import.meta.env.BASE_URL}images/Watermark.jpeg`}
               alt=""
               className="absolute inset-0 w-full h-full object-cover opacity-[0.08]"
             />
@@ -1553,7 +1578,7 @@ React.useEffect(() => {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-500">Amount:</span>
-                        <span className="font-black text-amber-900">₹{verifyResult.donation.amount.toLocaleString('en-IN')}</span>
+                        <span className="font-black text-amber-900">₹{Number(verifyResult.donation.amount || 0).toLocaleString('en-IN')}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-500">Receipt Email:</span>
@@ -1787,7 +1812,61 @@ React.useEffect(() => {
             volunteers={volunteers}
             currentVolunteer={currentVolunteer}
             onViewReceipt={onViewReceipt}
-            onConfirmDonation={onConfirmDonationFromSheet || (() => {})}
+            onConfirmDonation={async (donationId: string) => {
+              if (!currentVolunteer) {
+                return {
+                  success: false,
+                  error: 'Volunteer session is not active.'
+                };
+              }
+
+              const result = await onVerifyDonation(
+                donationId,
+                currentVolunteer.volunteerCode,
+                currentVolunteer.volunteerName
+              );
+
+              if (result.success) {
+
+                // Use the existing master donation record as the receipt source.
+                // This also protects us if the backend confirmation response
+                // does not return the complete DonationRecord.
+                const existingDonation =
+                  donations.find(
+                    d =>
+                      String(d.donationId).trim() ===
+                      String(donationId).trim()
+                  );
+
+                const receiptDonation: DonationRecord | undefined =
+                  result.donation?.donationId
+                    ? result.donation
+                    : existingDonation
+                      ? {
+                          ...existingDonation,
+                          paymentStatus: 'Paid',
+                          confirmedBy: currentVolunteer.volunteerCode,
+                          volunteerName: currentVolunteer.volunteerName,
+                          confirmationCode: '',
+                          receiptUrl:
+                            result.receiptUrl ||
+                            existingDonation.receiptUrl ||
+                            '',
+                          updatedAt: new Date().toISOString()
+                        }
+                      : undefined;
+
+                if (receiptDonation) {
+                  onViewReceipt(receiptDonation);
+                } else {
+                  alert(
+                    `Confirmation succeeded for ${donationId}, but the donation record could not be loaded for receipt generation.`
+                  );
+                }
+              }
+
+              return result;
+            }}
             onSendReceipt={onSendReceipt}
             onRepayment={onRepayment}
             onConfirmRepayment={onConfirmRepayment}

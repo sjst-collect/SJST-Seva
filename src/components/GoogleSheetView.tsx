@@ -15,9 +15,7 @@ import {
 } from 'lucide-react';
 import { DonationRecord, VolunteerRecord } from '../types';
 import { useGmailAuth } from '../context/GmailAuthContext';
-import { 
-  TARGET_SPREADSHEET_URL, 
-} from '../services/googleSheetsService';
+import { loadAppConfig } from '../services/appConfig';
 
 interface GoogleSheetViewProps {
   donations: DonationRecord[];
@@ -25,7 +23,14 @@ interface GoogleSheetViewProps {
   currentVolunteer: VolunteerRecord | null;
   onViewReceipt: (donation: DonationRecord) => void;
   onSendReceipt?: (donation: DonationRecord) => Promise<void>;
-  onConfirmDonation?: (donationId: string, volunteerName: string) => void;
+  onConfirmDonation?: (
+    donationId: string,
+    volunteerName: string
+  ) => Promise<{
+    success: boolean;
+    donation?: DonationRecord;
+    error?: string;
+  }>;
   onCancelDonation?: (donationId: string, volunteerName: string) => Promise<void>;
   onRepayment?: (donation: DonationRecord) => Promise<void>;
   onConfirmRepayment?: (donation: DonationRecord) => Promise<void>;
@@ -50,6 +55,33 @@ export function GoogleSheetView({
   const [modeFilter, setModeFilter] = useState<'All' | 'Cash' | 'UPI'>('All');
   const [volunteerFilter, setVolunteerFilter] = useState<string>('All');
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
+  const [spreadsheetUrl, setSpreadsheetUrl] = useState('');
+
+    useEffect(() => {
+    let isMounted = true;
+
+    loadAppConfig()
+      .then((config) => {
+        const spreadsheetId =
+          config.google?.spreadsheetId?.trim();
+
+        if (isMounted && spreadsheetId) {
+          setSpreadsheetUrl(
+            `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`
+          );
+        }
+      })
+      .catch((error) => {
+        console.error(
+          'Unable to load Google Spreadsheet configuration:',
+          error
+        );
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const currentRole = String(currentVolunteer?.role || '')
   .trim()
@@ -203,16 +235,38 @@ export function GoogleSheetView({
     );
   });
 
-  const handleExecuteConfirm = () => {
-    if (!confirmingDonation) return;
-    setIsProcessingConfirm(true);
-
-    if (onConfirmDonation) {
-      onConfirmDonation(confirmingDonation.donationId, selectedVolunteerForConfirm);
+  const handleExecuteConfirm = async () => {
+    if (!confirmingDonation) {
+      return;
     }
 
-    setConfirmSuccessMsg(`Payment confirmed for ${confirmingDonation.donorName}! Official receipt generated.`);
-    
+    setIsProcessingConfirm(true);
+
+    if (!onConfirmDonation) {
+      setIsProcessingConfirm(false);
+      return;
+    }
+
+    try {
+      const result = await onConfirmDonation(
+        confirmingDonation.donationId,
+        selectedVolunteerForConfirm
+      );
+
+      if (!result || !result.success) {
+        setIsProcessingConfirm(false);
+        return;
+      }
+
+      setConfirmSuccessMsg(
+        `Payment confirmed for ${confirmingDonation.donorName}!`
+      );
+
+    } catch (err: any) {
+      setIsProcessingConfirm(false);
+      return;
+    }
+
     setTimeout(() => {
       setIsProcessingConfirm(false);
       setConfirmSuccessMsg('');
@@ -321,7 +375,7 @@ export function GoogleSheetView({
             </button>
 
             <a
-              href={TARGET_SPREADSHEET_URL}
+              href={spreadsheetUrl || '#'}
               target="_blank"
               rel="noopener noreferrer"
               className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
@@ -594,7 +648,6 @@ export function GoogleSheetView({
                               type="button"
                               onClick={async () => {
                                 if (!onRepayment) {
-                                  alert('Repayment handler is not available.');
                                   return;
                                 }
 

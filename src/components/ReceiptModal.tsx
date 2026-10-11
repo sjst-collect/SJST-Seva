@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { getConfiguredBackendUrl } from '../services/appConfig';
 import { 
   X, 
   Printer, 
@@ -30,6 +31,7 @@ interface ReceiptModalProps {
   onClose: () => void;
   onVerifyDonation?: (
     confirmationCode: string,
+    volunteerCode: string,
     volunteerName: string
   ) => Promise<{ success: boolean; donation?: DonationRecord; error?: string }>;
 }
@@ -48,8 +50,8 @@ export function ReceiptModal({
 
   // Verification state within modal
   const [isConfirmingInModal, setIsConfirmingInModal] = useState(false);
-  const [selectedVolunteer, setSelectedVolunteer] = useState<string>(
-    volunteers[0]?.volunteerName || trustConfig.name
+  const [selectedVolunteerCode, setSelectedVolunteerCode] = useState<string>(
+    volunteers[0]?.volunteerCode || ''
   );
   const [confirmSuccessMsg, setConfirmSuccessMsg] = useState<string | null>(null);
   const [confirmErrorMsg, setConfirmErrorMsg] = useState<string | null>(null);
@@ -87,30 +89,64 @@ export function ReceiptModal({
 
   // Direct Verification from Receipt Modal
   const handleConfirmInModal = async () => {
+
     if (!onVerifyDonation) return;
+
+    const selectedVolunteerRecord = volunteers.find(
+      v => v.volunteerCode === selectedVolunteerCode
+    );
+
+    if (!selectedVolunteerRecord) {
+      setConfirmErrorMsg('Please select a valid volunteer.');
+      return;
+    }
+
     setIsConfirmingInModal(true);
+
     setConfirmErrorMsg(null);
+
     setConfirmSuccessMsg(null);
 
     try {
-      const code = currentDonation.confirmationCode || currentDonation.donationId;
-      const res = await onVerifyDonation(code, selectedVolunteer);
-    
-    if (res.success && res.donation) {
-      setDirectSuccessDonation(res.donation);
-    
-      // Automatically open the receipt after successful verification.
-      // This mounts ReceiptModal, which triggers the automatic
-      // PDF → Drive → Email workflow.
-      setModalReceiptDonation(res.donation);
-    } else {
-        setConfirmErrorMsg(res.error || 'Failed to verify donation.');
+
+      const code =
+        currentDonation.confirmationCode ||
+        currentDonation.donationId;
+
+      const res = await onVerifyDonation(
+        code,
+        selectedVolunteerRecord.volunteerCode,
+        selectedVolunteerRecord.volunteerName
+      );
+
+      if (res.success && res.donation) {
+
+        setDirectSuccessDonation(res.donation);
+
+        setCurrentDonation(res.donation);
+
+        setModalReceiptDonation(res.donation);
+
+      } else {
+
+        setConfirmErrorMsg(
+          res.error || 'Failed to verify donation.'
+        );
+
       }
+
     } catch (e: any) {
-      setConfirmErrorMsg(e.message || 'Error executing verification.');
+
+      setConfirmErrorMsg(
+        e.message || 'Error executing verification.'
+      );
+
     } finally {
+
       setIsConfirmingInModal(false);
+
     }
+
   };
 
   const handleDispatchEmail = async () => {
@@ -135,22 +171,26 @@ export function ReceiptModal({
 
 const uploadReceiptPdfToBackend = async (
   pdf: jsPDF,
-  fileName: string
+  fileName: string,
+  donationId: string
 ) => {
+
   const pdfDataUri = pdf.output('datauristring');
 
   const base64 = pdfDataUri.split(',')[1];
 
   const response = await fetch(
-    'https://script.google.com/macros/s/AKfycbyqpWTtvnZgmX1aN_atWUvH1fAeq8uwpYC0Zl-QrulToG-jtGYwNsA6xjkicRkia99xIg/exec',
+    getConfiguredBackendUrl(),
     {
       method: 'POST',
+
       headers: {
         'Content-Type': 'text/plain;charset=utf-8'
       },
+
       body: JSON.stringify({
         action: 'save_client_receipt_pdf',
-        donationId: currentDonation.donationId,
+        donationId,
         fileName,
         pdfBase64: base64
       })
@@ -161,7 +201,8 @@ const uploadReceiptPdfToBackend = async (
 
   if (!result.success) {
     throw new Error(
-      result.error || 'Unable to save receipt PDF to Google Drive.'
+      result.error ||
+      'Unable to save receipt PDF to Google Drive.'
     );
   }
 
@@ -316,323 +357,398 @@ const uploadReceiptPdfToBackend = async (
       setIsGeneratingPdf(false);
     }
   };
-  const handleAutoSaveReceiptPdf = async (): Promise<boolean> => {
-    if (!currentDonation) {
-      return false;
+  
+// =========================================================
+// STAGE 2 — GENERATE OFFICIAL RECEIPT PDF
+//
+// Responsibility:
+//   1. Wait for receipt assets
+//   2. Convert the rendered receipt to PNG
+//   3. Convert PNG to PDF
+//
+// IMPORTANT:
+//   - Does NOT save to Google Drive
+//   - Does NOT send email
+//   - Does NOT update Google Sheet
+//   - Uses only the immutable donation snapshot
+// =========================================================
+const generateOfficialReceiptPdf = async (
+  donationSnapshot: DonationRecord,
+  receiptElement: HTMLElement
+): Promise<{
+  pdf: jsPDF;
+  fileName: string;
+}> => {
+
+  if (!donationSnapshot.donationId) {
+    throw new Error('Donation ID is required to generate receipt.');
+  }
+
+  if (
+    String(donationSnapshot.paymentStatus || '')
+      .trim()
+      .toLowerCase() !== 'paid'
+  ) {
+    throw new Error(
+      `Donation ${donationSnapshot.donationId} is not Paid.`
+    );
+  }
+
+  console.log(
+    'RECEIPT GENERATION: START',
+    donationSnapshot.donationId
+  );
+
+  // ---------------------------------------------------------
+  // Wait for receipt assets
+  // ---------------------------------------------------------
+  await waitForReceiptAssets(receiptElement);
+
+  await new Promise(resolve =>
+    setTimeout(resolve, 500)
+  );
+
+  console.log(
+    'RECEIPT GENERATION: Assets ready',
+    donationSnapshot.donationId
+  );
+
+  // ---------------------------------------------------------
+  // Convert the EXACT rendered receipt to PNG
+  // ---------------------------------------------------------
+  const dataUrl = await toPng(receiptElement, {
+    pixelRatio: 3,
+    cacheBust: true,
+    backgroundColor: '#FFF3E0',
+    skipFonts: false
+  });
+
+  console.log(
+    'RECEIPT GENERATION: PNG created',
+    donationSnapshot.donationId
+  );
+
+  // ---------------------------------------------------------
+  // Load generated image
+  // ---------------------------------------------------------
+  const img = new Image();
+
+  await new Promise<void>((resolve, reject) => {
+
+    img.onload = () => resolve();
+
+    img.onerror = () =>
+      reject(
+        new Error(
+          'Receipt image could not be loaded.'
+        )
+      );
+
+    img.src = dataUrl;
+  });
+
+  // ---------------------------------------------------------
+  // Create official receipt PDF
+  // ---------------------------------------------------------
+  const pdf = new jsPDF({
+    orientation: 'landscape',
+    unit: 'mm',
+    format: [210, 105]
+  });
+
+  pdf.addImage(
+    dataUrl,
+    'PNG',
+    0,
+    0,
+    210,
+    105,
+    undefined,
+    'FAST'
+  );
+
+  const fileName =
+    `SJST_Official_Receipt_${donationSnapshot.donationId}.pdf`;
+
+  console.log(
+    'RECEIPT GENERATION: PDF created',
+    donationSnapshot.donationId,
+    fileName
+  );
+
+  return {
+    pdf,
+    fileName
+  };
+};
+
+  // =========================================================
+// STAGE 3+4 ORCHESTRATOR
+//
+// Stage 2 = Generate PDF
+// Stage 3 = Save PDF to Drive
+// Stage 4 = Send PDF by Email
+//
+// This function ONLY coordinates those stages.
+// =========================================================
+const handleAutoSaveReceiptPdf = async (
+  donationSnapshot: DonationRecord,
+  receiptElement: HTMLElement
+): Promise<boolean> => {
+
+  try {
+
+    console.log(
+      'AUTO RECEIPT: Starting workflow for:',
+      donationSnapshot.donationId
+    );
+
+    // -------------------------------------------------------
+    // STAGE 2 — GENERATE RECEIPT
+    // -------------------------------------------------------
+    const {
+      pdf,
+      fileName
+    } = await generateOfficialReceiptPdf(
+      donationSnapshot,
+      receiptElement
+    );
+
+    console.log(
+      'AUTO RECEIPT: Stage 2 complete:',
+      donationSnapshot.donationId,
+      fileName
+    );
+
+    // -------------------------------------------------------
+    // STAGE 3 — SAVE RECEIPT
+    // -------------------------------------------------------
+    console.log(
+      'AUTO RECEIPT: Stage 3 - Uploading PDF:',
+      donationSnapshot.donationId
+    );
+
+    const backendResult =
+      await uploadReceiptPdfToBackend(
+        pdf,
+        fileName,
+        donationSnapshot.donationId
+      );
+
+    console.log(
+      'AUTO RECEIPT: Stage 3 response:',
+      donationSnapshot.donationId,
+      backendResult
+    );
+
+    if (!backendResult?.success) {
+      throw new Error(
+        backendResult?.error ||
+        'Backend failed to save the receipt PDF.'
+      );
     }
-  
+
+    // -------------------------------------------------------
+    // STAGE 4 — EMAIL RESULT
+    // -------------------------------------------------------
+    if (
+      backendResult.emailStatus &&
+      backendResult.emailStatus !== 'Sent'
+    ) {
+      throw new Error(
+        backendResult.emailError ||
+        'Receipt was saved to Drive but email was not sent.'
+      );
+    }
+
+    console.log(
+      'AUTO RECEIPT: WORKFLOW COMPLETE:',
+      donationSnapshot.donationId,
+      backendResult.receiptUrl
+    );
+
+    return true;
+
+  } catch (error) {
+
+    console.error(
+      'AUTO RECEIPT: FAILED:',
+      donationSnapshot.donationId,
+      error
+    );
+
+    throw error;
+  }
+};
+
+ useEffect(() => {
+
+  if (!currentDonation) {
+    return;
+  }
+
+  // Only automatic processing for Paid donations.
+  if (currentDonation.paymentStatus !== 'Paid') {
+    return;
+  }
+
+  // Existing receipt = nothing to generate.
+  if (currentDonation.receiptUrl) {
+
+    console.log(
+      'AUTO RECEIPT: Existing receipt found:',
+      currentDonation.donationId
+    );
+
+    return;
+  }
+
+  // Already processed in this mounted instance.
+  if (
+    autoReceiptProcessedRef.current ===
+    currentDonation.donationId
+  ) {
+
+    return;
+  }
+
+  // ---------------------------------------------------------
+  // IMPORTANT:
+  // Capture an IMMUTABLE snapshot of this donation.
+  // Do not allow subsequent modal changes to affect the job.
+  // ---------------------------------------------------------
+
+  const donationSnapshot: DonationRecord = {
+    ...currentDonation
+  };
+
+  // ---------------------------------------------------------
+  // Capture the currently rendered receipt immediately.
+  // ---------------------------------------------------------
+
+  const sourceElement =
+    document.getElementById(
+      'compact-digital-receipt'
+    );
+
+  if (!sourceElement) {
+
+    console.error(
+      'AUTO RECEIPT: Receipt element not available:',
+      donationSnapshot.donationId
+    );
+
+    return;
+  }
+
+  // ---------------------------------------------------------
+  // CLONE THE RECEIPT DOM.
+  //
+  // This is the critical fix.
+  //
+  // The clone survives even when:
+  // - user closes ReceiptModal
+  // - user opens another donation
+  // - user changes screen
+  // - currentDonation changes
+  // ---------------------------------------------------------
+
+  const receiptClone =
+    sourceElement.cloneNode(true) as HTMLElement;
+
+  receiptClone.setAttribute(
+    'data-receipt-background-job',
+    donationSnapshot.donationId
+  );
+
+  // Put clone outside the visible screen.
+  // DO NOT use display:none because html-to-image needs
+  // a rendered element.
+  receiptClone.style.position = 'fixed';
+  receiptClone.style.left = '-100000px';
+  receiptClone.style.top = '0';
+  receiptClone.style.zIndex = '-1';
+  receiptClone.style.pointerEvents = 'none';
+  receiptClone.style.visibility = 'visible';
+
+  document.body.appendChild(receiptClone);
+
+  console.log(
+    'AUTO RECEIPT: Background snapshot created:',
+    donationSnapshot.donationId
+  );
+
+  // ---------------------------------------------------------
+  // START BACKGROUND JOB
+  //
+  // NO cancellation on modal close/change.
+  // ---------------------------------------------------------
+
+  const processReceiptInBackground = async () => {
+
     try {
-  
-      console.log(
-        'AUTO RECEIPT: Starting for donation:',
-        currentDonation.donationId
-      );
-  
-      // ---------------------------------------------------------
-      // Wait for the actual receipt DOM element to exist.
-      // ---------------------------------------------------------
-  
-      let receiptElement: HTMLElement | null = null;
-  
-      for (let attempt = 0; attempt < 20; attempt++) {
-  
-        receiptElement = document.getElementById(
-          'compact-digital-receipt'
+
+      const success =
+        await handleAutoSaveReceiptPdf(
+          donationSnapshot,
+          receiptClone
         );
-  
-        if (receiptElement) {
-          break;
-        }
-  
+
+      if (success) {
+
+        autoReceiptProcessedRef.current =
+          donationSnapshot.donationId;
+
         console.log(
-          `AUTO RECEIPT: Waiting for receipt element... attempt ${attempt + 1}`
-        );
-  
-        await new Promise(resolve =>
-          setTimeout(resolve, 300)
+          'AUTO RECEIPT: Background job completed:',
+          donationSnapshot.donationId
         );
       }
-  
-      if (!receiptElement) {
-        throw new Error(
-          'Receipt element was not rendered after waiting.'
-        );
-      }
-  
-      console.log(
-        'AUTO RECEIPT: Receipt element found.'
-      );
-  
-      // ---------------------------------------------------------
-      // Wait for logo, watermark, fonts and other assets.
-      // ---------------------------------------------------------
-  
-      await waitForReceiptAssets(receiptElement);
-  
-      // Give browser a little additional time to paint everything.
-      await new Promise(resolve =>
-        setTimeout(resolve, 500)
-      );
-  
-      console.log(
-        'AUTO RECEIPT: Receipt assets ready. Creating PNG...'
-      );
-  
-      // ---------------------------------------------------------
-      // Generate image from the SAME online receipt.
-      // ---------------------------------------------------------
-  
-      const dataUrl = await toPng(receiptElement, {
-        pixelRatio: 3,
-        cacheBust: true,
-        backgroundColor: '#FFF3E0',
-        skipFonts: false
-      });
-  
-      console.log(
-        'AUTO RECEIPT: PNG generated.'
-      );
-  
-      // ---------------------------------------------------------
-      // Convert PNG to PDF.
-      // ---------------------------------------------------------
-  
-      const img = new Image();
-  
-      await new Promise<void>((resolve, reject) => {
-  
-        img.onload = () => resolve();
-  
-        img.onerror = () =>
-          reject(
-            new Error(
-              'Receipt image could not be loaded.'
-            )
-          );
-  
-        img.src = dataUrl;
-      });
-  
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: [210, 105]
-      });
-  
-      pdf.addImage(
-        dataUrl,
-        'PNG',
-        0,
-        0,
-        210,
-        105,
-        undefined,
-        'FAST'
-      );
-  
-      console.log(
-        'AUTO RECEIPT: PDF generated.'
-      );
-  
-      // ---------------------------------------------------------
-      // Send EXACT PDF to Apps Script.
-      // Apps Script saves it to Drive and emails it.
-      // ---------------------------------------------------------
-  
-      const fileName =
-        `SJST_Official_Receipt_${currentDonation.donationId}.pdf`;
-  
-      console.log(
-        'AUTO RECEIPT: Uploading PDF to backend...'
-      );
-  
-      const backendResult =
-        await uploadReceiptPdfToBackend(
-          pdf,
-          fileName
-        );
-  
-      console.log(
-        'AUTO RECEIPT: Backend response:',
-        backendResult
-      );
-  
-      if (!backendResult?.success) {
-        throw new Error(
-          backendResult?.error ||
-          'Backend failed to save the receipt PDF.'
-        );
-      }
-  
-      // ---------------------------------------------------------
-      // Make sure email was actually sent.
-      // ---------------------------------------------------------
-  
-      if (
-        backendResult.emailStatus &&
-        backendResult.emailStatus !== 'Sent'
-      ) {
-        throw new Error(
-          backendResult.emailError ||
-          'Receipt was saved to Drive but email was not sent.'
-        );
-      }
-  
-      // ---------------------------------------------------------
-      // Update local receipt state.
-      // ---------------------------------------------------------
-  
-      setCurrentDonation(prev => {
-  
-        if (!prev) {
-          return prev;
-        }
-  
-        return {
-          ...prev,
-  
-          receiptUrl:
-            backendResult.receiptUrl ||
-            prev.receiptUrl,
-  
-          emailStatus:
-            backendResult.emailStatus ||
-            prev.emailStatus
-        };
-      });
-  
-      console.log(
-        'AUTO RECEIPT: COMPLETE.',
-        backendResult.receiptUrl
-      );
-  
-      return true;
-  
+
     } catch (error) {
-  
+
       console.error(
-        'AUTO RECEIPT: FAILED:',
+        'AUTO RECEIPT: Background job failed:',
+        donationSnapshot.donationId,
         error
       );
-  
-      // IMPORTANT:
-      // Re-throw so the useEffect knows the process failed.
-      throw error;
+
+    } finally {
+
+      // -------------------------------------------------------
+      // Always remove the background DOM snapshot.
+      // -------------------------------------------------------
+
+      if (receiptClone.parentNode) {
+        receiptClone.parentNode.removeChild(
+          receiptClone
+        );
+      }
+
     }
   };
 
- useEffect(() => {
-    if (!currentDonation) return;
-  
-    // Only automatic processing for Paid donations.
-    if (currentDonation.paymentStatus !== 'Paid') return;
-  
-    // Existing receipt = do not generate another PDF.
-    if (currentDonation.receiptUrl) {
-      console.log(
-        'AUTO RECEIPT: Existing receipt found. No new PDF required.'
-      );
-      return;
-    }
-  
-    // Already successfully processed.
-    if (
-      autoReceiptProcessedRef.current ===
-      currentDonation.donationId
-    ) {
-      return;
-    }
-  
-    let cancelled = false;
-    let attempts = 0;
-  
-    const tryAutomaticReceipt = async () => {
-      // Maximum ~10 seconds waiting for receipt to render.
-      if (cancelled || attempts >= 20) {
-        console.error(
-          'AUTO RECEIPT: Receipt did not become ready.'
-        );
-        return;
-      }
-  
-      attempts++;
-  
-      const receiptElement = document.getElementById(
-        'compact-digital-receipt'
-      );
-  
-      // Receipt has not mounted yet.
-      // Keep trying — DO NOT give up.
-      if (!receiptElement) {
-        setTimeout(tryAutomaticReceipt, 500);
-        return;
-      }
-  
-      // Prevent duplicate processing.
-      if (
-        autoReceiptProcessedRef.current ===
-        currentDonation.donationId
-      ) {
-        return;
-      }
-  
-      try {
-        console.log(
-          'AUTO RECEIPT: Receipt is ready. Starting automatic PDF workflow.'
-        );
-  
-        const success =
-          await handleAutoSaveReceiptPdf();
-  
-        if (cancelled) return;
-  
-        if (success) {
-          // Mark ONLY after PDF + Drive + Email succeeded.
-          autoReceiptProcessedRef.current =
-            currentDonation.donationId;
-  
-          setConfirmSuccessMsg(
-            '🎉 Offering confirmed & verified! Official Receipt generated, saved to Drive and emailed successfully.'
-          );
-  
-          console.log(
-            'AUTO RECEIPT: COMPLETE — PDF saved to Drive and email sent.'
-          );
-        }
-  
-      } catch (error) {
-  
-        console.error(
-          'AUTO RECEIPT: Automatic workflow failed:',
-          error
-        );
-  
-        autoReceiptProcessedRef.current = null;
-  
-        setConfirmErrorMsg(
-          error instanceof Error
-            ? error.message
-            : 'Unable to generate, save and email the official receipt.'
-        );
-      }
-    };
-  
-    // Give React one render cycle before starting.
-    const timer = setTimeout(
-      tryAutomaticReceipt,
-      500
-    );
-  
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  
-  }, [
-    currentDonation?.donationId,
-    currentDonation?.paymentStatus,
-    currentDonation?.receiptUrl
-  ]);
+  // Start asynchronously.
+  void processReceiptInBackground();
+
+  // ---------------------------------------------------------
+  // IMPORTANT:
+  // There is intentionally NO:
+  //
+  //   let cancelled = false;
+  //
+  //   cancelled = true;
+  //
+  //   clearTimeout(...)
+  //
+  // The receipt job must survive modal changes/unmount.
+  // ---------------------------------------------------------
+
+}, [
+  currentDonation?.donationId,
+  currentDonation?.paymentStatus,
+  currentDonation?.receiptUrl
+]);
     
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white">
@@ -725,21 +841,25 @@ const uploadReceiptPdfToBackend = async (
 
             <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
               <select
-                value={selectedVolunteer}
-                onChange={e => setSelectedVolunteer(e.target.value)}
+                value={selectedVolunteerCode}
+                onChange={e => setSelectedVolunteerCode(e.target.value)}
                 className="bg-white border border-amber-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 focus:outline-hidden"
               >
                 {volunteers.length > 0 ? (
                   volunteers.map(v => (
-                    <option key={v.volunteerCode} value={v.volunteerName}>
+                    <option
+                      key={v.volunteerCode}
+                      value={v.volunteerCode}
+                    >
                       {v.volunteerName} ({v.volunteerCode})
                     </option>
                   ))
                 ) : (
-                  <option value={trustConfig.name}>{trustConfig.name}</option>
+                  <option value="">
+                    {trustConfig.name}
+                  </option>
                 )}
               </select>
-
               <button
                 onClick={handleConfirmInModal}
                 disabled={isConfirmingInModal}
@@ -840,7 +960,7 @@ const uploadReceiptPdfToBackend = async (
                       <span className="font-bold text-amber-950">Regd. No.:</span> {trustConfig.regdNo} • <span className="font-bold text-amber-950">PAN:</span> {trustConfig.panNo || 'AAATS12018F'}
                     </div>
                     <div className="text-[9px] sm:text-[10px] font-sans text-slate-600 leading-tight truncate max-w-[420px]">
-                      {trustConfig.address || 'Flat No. 103, G5,Unnathi Greens,G.B. Road, Kasarvadavali,  Thane (West) - 400615, Maharashtra'}
+                      {trustConfig.address || ''}
                     </div>
                     <div className="text-[9px] font-sans text-slate-600">
                       <strong>Email:</strong> <span className="text-amber-900 font-bold">{trustConfig.email}</span>
@@ -935,7 +1055,7 @@ const uploadReceiptPdfToBackend = async (
                     ) : (
                       <span className="text-emerald-800 font-bold flex items-center gap-0.5 font-mono text-[9.5px]">
                         <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                        <span>✓ Paid ({currentDonation.confirmedBy || 'Verified'})</span>
+                        <span>✓ Paid ({currentDonation.volunteerName || 'Verified'})</span>
                       </span>
                     )}
                   </div>
@@ -1054,38 +1174,6 @@ const uploadReceiptPdfToBackend = async (
                 <span>Verify &amp; Finalize</span>
               </button>
             )}
-
-            <button
-              onClick={handlePrint}
-              className="flex-1 sm:flex-none px-3.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Print</span>
-            </button>
-
-            <button
-              onClick={handleDownloadPdf}
-              disabled={isGeneratingPdf}
-              className="flex-1 sm:flex-none px-4 py-1.5 bg-amber-800 hover:bg-amber-900 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
-            >
-              {isGeneratingPdf ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Generating PDF...</span>
-                </>
-              ) : downloadSuccess ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-300" />
-                  <span>Saved PDF!</span>
-                </>
-              ) : (
-                <>
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download PDF (210×105 mm)</span>
-                </>
-              )}
-            </button>
-
             <button
               onClick={onClose}
               className="px-3.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"

@@ -18,7 +18,10 @@ import {
 } from 'lucide-react';
 
 import { DonationRecord, VolunteerRecord, TrustConfig } from './types';
-import { TRUST_CONFIG } from './data/mockData';
+import {
+  loadAppConfig,
+  getConfiguredBackendUrl
+} from './services/appConfig';
 import { DonorForm } from './components/DonorForm';
 import { VolunteerPortal } from './components/VolunteerPortal';
 import { GoogleSheetView } from './components/GoogleSheetView';
@@ -64,13 +67,6 @@ class AppErrorBoundary extends React.Component<
       error,
       errorInfo
     );
-
-    alert(
-      'SJST APPLICATION ERROR\n\n' +
-      message +
-      '\n\n' +
-      'Please send this exact error message to Admin.'
-    );
   }
 
   render() {
@@ -108,41 +104,60 @@ class AppErrorBoundary extends React.Component<
   }
 }
 function App() {
-  const [trustConfig, setTrustConfig] = useState<TrustConfig>(() => {
-    const saved = localStorage.getItem('sjst_trust_config');
-  
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-  
-        return {
-          ...TRUST_CONFIG,
-          ...parsed,
-  
-          // Use current configured values when old localStorage
-          // contains blank or missing payment details.
-          bankName: parsed.bankName || TRUST_CONFIG.bankName,
-          accountName: parsed.accountName || TRUST_CONFIG.accountName,
-          accountNo: parsed.accountNo || TRUST_CONFIG.accountNo,
-          ifsc: parsed.ifsc || TRUST_CONFIG.ifsc,
-          branch: parsed.branch || TRUST_CONFIG.branch,
-          upiId: parsed.upiId || TRUST_CONFIG.upiId,
-  
-          regdNo: parsed.regdNo || TRUST_CONFIG.regdNo,
-          receiptsFolderId:
-            parsed.receiptsFolderId || TRUST_CONFIG.receiptsFolderId
-        };
-      } catch (error) {
-        console.error(
-          'Unable to load saved Trust Configuration:',
-          error
-        );
-      }
-    }
-  
-    return TRUST_CONFIG;
+  const [trustConfig, setTrustConfig] = useState<TrustConfig>({
+    name: '',
+    regdNo: '',
+    email: '',
+    address: '',
+    phone: '',
+    panNo: '',
+    section80G: '',
+    bankName: '',
+    accountName: '',
+    accountNo: '',
+    ifsc: '',
+    branch: '',
+    upiId: '',
+    receiptsFolderId: ''
   });
 
+  React.useEffect(() => {
+    let isMounted = true;
+
+    loadAppConfig()
+      .then((config) => {
+        if (!isMounted) return;
+
+        const updatedTrustConfig: TrustConfig = {
+          name: config.trust?.name || '',
+          regdNo: config.trust?.regdNo || '',
+          email: config.trust?.email || '',
+          address: config.trust?.address || '',
+          phone: config.trust?.phone || '',
+          panNo: '',
+          section80G: '',
+          bankName: config.payment?.bankName || '',
+          accountName: config.payment?.accountName || '',
+          accountNo: config.payment?.accountNo || '',
+          ifsc: config.payment?.ifsc || '',
+          branch: config.payment?.branch || '',
+          upiId: config.payment?.upiId || '',
+          receiptsFolderId: ''
+        };
+
+        setTrustConfig(updatedTrustConfig);
+      })
+      .catch((error) => {
+        console.error(
+          'Unable to load Trust Configuration:',
+          error
+        );
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const [donations, setDonations] = useState<DonationRecord[]>(() => {
     // Return empty array to prevent loading old test cache
@@ -208,9 +223,14 @@ function App() {
     const requestId = ++refreshRequestRef.current;
 
     try {
+      alert(
+        `DEBUG: Live Sheet refresh\nOAuth token available: ${
+          Boolean(googleAccessToken) ? 'YES' : 'NO'
+        }`
+      );
       const donRes = await googleSheetsService.fetchDonationsFromGoogleSheet(
         googleAccessToken,
-        googleSheetsService.TARGET_SPREADSHEET_ID,
+        undefined,
         'Donations'
       );
 
@@ -260,7 +280,7 @@ function App() {
 
     try {
       await fetch(
-        googleSheetsService.DEFAULT_WEBHOOK_URL,
+        await getConfiguredBackendUrl(),
         {
           method: 'POST',
           headers: {
@@ -299,7 +319,7 @@ function App() {
   ): Promise<void> => {
     try {
       await fetch(
-        googleSheetsService.DEFAULT_WEBHOOK_URL,
+        await getConfiguredBackendUrl(),
         {
           method: 'POST',
           headers: {
@@ -336,19 +356,21 @@ function App() {
   const handleConfirmRepaymentFromSheet = async (
     donation: DonationRecord
   ): Promise<void> => {
-    const confirmedBy = (() => {
+    const activeVolunteer = (() => {
       try {
         const saved = sessionStorage.getItem('sjst_active_volunteer');
-        const parsed = saved ? JSON.parse(saved) : null;
-        return parsed?.volunteerCode || '';
+        return saved ? JSON.parse(saved) : null;
       } catch {
-        return '';
+        return null;
       }
     })();
 
+    const confirmedBy = activeVolunteer?.volunteerCode || '';
+    const volunteerName = activeVolunteer?.volunteerName || '';
+
     try {
       await fetch(
-        googleSheetsService.DEFAULT_WEBHOOK_URL,
+        await getConfiguredBackendUrl(),
         {
           method: 'POST',
           headers: {
@@ -358,7 +380,8 @@ function App() {
             action: 'confirm_repayment',
             donationId: donation.donationId.trim(),
             volunteerCode: confirmedBy,
-            confirmedBy: confirmedBy
+            confirmedBy: confirmedBy,
+            volunteerName
           }),
           redirect: 'follow'
         }
@@ -397,10 +420,6 @@ function App() {
     }
   }, [activeView]);
   
-  React.useEffect(() => {
-    localStorage.setItem('sjst_trust_config', JSON.stringify(trustConfig));
-  }, [trustConfig]);
-
   // DEVOTEE / DONOR SUBMISSION HANDLER
   const handleDonorSubmit = async (formData: {
     donorName: string;
@@ -410,9 +429,8 @@ function App() {
     sevaCategory: string;
     sevaHead: string;
   }): Promise<DonationRecord> => {
-    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const seq = String(donations.length + 1).padStart(4, '0');
-    const donationId = `SJST-${dateStr}-${seq}`;
+    const donationId =
+      await googleSheetsService.getNextDonationId();
     
     const confirmationCode = String(Math.floor(100000 + Math.random() * 900000));
     const paymentStatus: 'Paid' | 'Confirmation Pending' = 'Confirmation Pending';
@@ -445,12 +463,12 @@ function App() {
 
     setDonations(prev => [newRecord, ...prev]);
 
-    googleSheetsService.syncDonationToGoogleSheet(
+    await googleSheetsService.syncDonationToGoogleSheet(
       newRecord,
-      googleAccessToken
-    ).catch(err => {
-      console.warn('Initial Google Sheet sync warning:', err);
-    });
+      googleAccessToken,
+      undefined,
+      { directVolunteerEntry: true }
+    );
 
     return newRecord;
   };
@@ -465,11 +483,11 @@ function App() {
     volunteerName: string;
     volunteerCode: string;
   }): Promise<DonationRecord> => {
-    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const seq = String(donations.length + 1).padStart(4, '0');
-    const donationId = `SJST-${dateStr}-${seq}`;
+    const donationId =
+    await googleSheetsService.getNextDonationId();
     const confirmationCode = '';
-    const confirmedBy = formData.volunteerName;
+    const confirmedBy = formData.volunteerCode;
+    const volunteerName = formData.volunteerName;
     const paymentStatus = 'Paid';
     const paymentReference = formData.paymentMode === 'Cash' ? 'CASH-COUNTER-DIRECT' : 'UPI-COUNTER-DIRECT';
     let driveReceiptUrl = `https://drive.google.com/file/d/receipt-${donationId}/view`;
@@ -494,6 +512,7 @@ function App() {
       updatedAt: new Date().toISOString(),
       confirmationCode,
       confirmedBy,
+      volunteerName,
       sevaCategory: formData.sevaCategory,
       sevaHead: formData.sevaHead
     };
@@ -503,20 +522,28 @@ function App() {
 
     setDonations(prev => [newRecord, ...prev]);
 
-    googleSheetsService.syncDonationToGoogleSheet(
-      newRecord,
-      googleAccessToken,
-      undefined,
-      { directVolunteerEntry: true }
-    ).catch(err => {
-      console.error('VOLUNTEER SHEET SYNC ERROR:', err);
-    });
+    try {
+      await googleSheetsService.syncDonationToGoogleSheet(
+        newRecord,
+        googleAccessToken,
+        undefined,
+        { directVolunteerEntry: true }
+      );
+    } catch (err) {
+      console.error(
+        'VOLUNTEER SHEET SYNC ERROR:',
+        err
+      );
+
+      throw err;
+    }
 
     return newRecord;
   };
   
     const handleVolunteerVerify = async (
     confirmationCode: string,
+    volunteerCode: string,
     volunteerName: string
     ): Promise<{
       success: boolean;
@@ -528,6 +555,7 @@ function App() {
       try {
         const result = await googleSheetsService.verifyDonationByPin(
           cleanCode,
+          volunteerCode,
           volunteerName
         );
 
@@ -543,7 +571,8 @@ function App() {
         const updatedRecord: DonationRecord = {
           ...result.donation,
           paymentStatus: 'Paid',
-          confirmedBy: volunteerName,
+          confirmedBy: volunteerCode,
+          volunteerName,
           confirmationCode: '',
           receiptUrl: result.receiptUrl || result.donation?.receiptUrl || '',
           updatedAt: new Date().toISOString()
@@ -624,9 +653,12 @@ function App() {
 
   const handleConfirmDonationFromSheet = async (
     donationId: string,
+    volunteerCode: string,
     volunteerName: string
   ) => {
-    const target = donations.find(d => d.donationId === donationId);
+    const target = donations.find(
+      d => d.donationId === donationId
+    );
 
     if (!target) {
       return {
@@ -635,19 +667,50 @@ function App() {
       };
     }
 
+    const cleanVolunteerCode =
+      String(volunteerCode || '').trim().toUpperCase();
+
+    const cleanVolunteerName =
+      String(volunteerName || '').trim();
+
+    if (!cleanVolunteerCode) {
+      return {
+        success: false,
+        error: 'Active volunteer code is missing.'
+      };
+    }
+
+    if (!cleanVolunteerName) {
+      return {
+        success: false,
+        error: 'Volunteer name is missing.'
+      };
+    }
+
     try {
+      console.log(
+        'LIVE SHEET CONFIRM REQUEST:',
+        {
+          donationId,
+          volunteerCode: cleanVolunteerCode,
+          volunteerName: cleanVolunteerName
+        }
+      );
+
       const response = await fetch(
-        googleSheetsService.DEFAULT_WEBHOOK_URL,
+        await getConfiguredBackendUrl(),
         {
           method: 'POST',
           headers: {
-            'Content-Type': 'text/plain;charset=utf-8'
+            'Content-Type':
+              'text/plain;charset=utf-8'
           },
           body: JSON.stringify({
             action: 'confirm_sheet_donation',
             donationId: donationId.trim(),
-            volunteerCode: currentVolunteer?.volunteerCode || '',
-            confirmedBy: currentVolunteer?.volunteerCode || ''
+            volunteerCode: cleanVolunteerCode,
+            confirmedBy: cleanVolunteerCode,
+            volunteerName: cleanVolunteerName
           }),
           redirect: 'follow'
         }
@@ -655,18 +718,55 @@ function App() {
 
       const result = await response.json();
 
+      console.log(
+        'LIVE SHEET CONFIRM RESPONSE:',
+        result
+      );
+
       if (!result.success) {
-        return result;
+        return {
+          success: false,
+          error:
+            result.error ||
+            'Payment confirmation failed.'
+        };
       }
+
+      /*
+      * Backend has already executed:
+      *
+      * H = Paid
+      * N = Updated timestamp
+      * O = Volunteer Code
+      * P = blank
+      * Q = Volunteer Name
+      */
 
       const updatedRecord: DonationRecord = {
         ...target,
+
         paymentStatus: 'Paid',
-        confirmedBy: currentVolunteer?.volunteerCode || '',
+
+        confirmedBy:
+          result.confirmedBy ||
+          cleanVolunteerCode,
+
+        volunteerName:
+          result.volunteerName ||
+          cleanVolunteerName,
+
         confirmationCode: '',
-        receiptUrl: result.receiptUrl || '',
-        emailStatus: result.emailStatus || 'Not Required',
-        updatedAt: new Date().toISOString()
+
+        receiptUrl:
+          result.receiptUrl || '',
+
+        emailStatus:
+          result.emailStatus ||
+          'Pending',
+
+        updatedAt:
+          result.updatedAt ||
+          new Date().toISOString()
       };
 
       setDonations(prev =>
@@ -678,19 +778,22 @@ function App() {
       );
 
       return {
-        ...result,
+        success: true,
         donation: updatedRecord
       };
 
     } catch (err: any) {
+
       console.error(
-        'SHEET CONFIRMATION ERROR:',
+        'LIVE SHEET CONFIRMATION ERROR:',
         err
       );
 
       return {
         success: false,
-        error: err.message || 'Network error during donation confirmation.'
+        error:
+          err?.message ||
+          'Network error during donation confirmation.'
       };
     }
   };
@@ -720,7 +823,7 @@ function App() {
 
     try {
       await fetch(
-        googleSheetsService.DEFAULT_WEBHOOK_URL,
+        await getConfiguredBackendUrl(),
         {
           method: 'POST',
           headers: {
@@ -784,7 +887,7 @@ function App() {
                         {trustConfig.name}
                       </span>
                       <span className="text-[10px] font-bold uppercase bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full">
-                        Regd: {trustConfig.trustRegNo}
+                        Regd: {trustConfig.regdNo}
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
@@ -864,11 +967,17 @@ function App() {
               volunteers={volunteers}
               onSubmitDonation={handleDonorSubmit}
               onViewReceipt={d => setModalReceiptDonation(d)}
-              onVerifyDonation={async (code, volName) => {
-                const res = await handleVolunteerVerify(code, volName);
+              onVerifyDonation={async (code, volunteerCode, volunteerName) => {
+                const res = await handleVolunteerVerify(
+                  code,
+                  volunteerCode,
+                  volunteerName
+                );
+
                 if (res.success && res.donation) {
                   setModalReceiptDonation(res.donation);
                 }
+
                 return res;
               }}
             />
@@ -957,11 +1066,22 @@ function App() {
           donation={modalReceiptDonation}
           trustConfig={trustConfig}
           volunteers={volunteers}
-          onVerifyDonation={async (code, volName) => {
-            const res = await handleVolunteerVerify(code, volName);
+          onVerifyDonation={async (
+            code,
+            volunteerCode,
+            volunteerName
+          ) => {
+
+            const res = await handleVolunteerVerify(
+              code,
+              volunteerCode,
+              volunteerName
+            );
+
             if (res.success && res.donation) {
               setModalReceiptDonation(res.donation);
             }
+
             return res;
           }}
           onClose={() => setModalReceiptDonation(null)}
