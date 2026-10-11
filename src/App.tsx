@@ -223,11 +223,6 @@ function App() {
     const requestId = ++refreshRequestRef.current;
 
     try {
-      alert(
-        `DEBUG: Live Sheet refresh\nOAuth token available: ${
-          Boolean(googleAccessToken) ? 'YES' : 'NO'
-        }`
-      );
       const donRes = await googleSheetsService.fetchDonationsFromGoogleSheet(
         googleAccessToken,
         undefined,
