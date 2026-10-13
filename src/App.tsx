@@ -67,6 +67,13 @@ class AppErrorBoundary extends React.Component<
       error,
       errorInfo
     );
+
+    alert(
+      'SJST APPLICATION ERROR\n\n' +
+      message +
+      '\n\n' +
+      'Please send this exact error message to Admin.'
+    );
   }
 
   render() {
@@ -419,6 +426,7 @@ function App() {
   const handleDonorSubmit = async (formData: {
     donorName: string;
     email: string;
+    mobile: string;
     amount: number;
     paymentMode: 'Cash' | 'UPI';
     sevaCategory: string;
@@ -438,8 +446,8 @@ function App() {
       donationId,
       submittedAt: new Date().toISOString(),
       donorName: formData.donorName,
-      mobile: '',
-      phone: '',
+      mobile: formData.mobile.trim(),
+      phone: formData.mobile.trim(),
       email: formData.email,
       amount: formData.amount,
       paymentMode: formData.paymentMode,
@@ -471,6 +479,7 @@ function App() {
   const handleVolunteerDirectDonation = async (formData: {
     donorName: string;
     email: string;
+    mobile: string;
     amount: number;
     paymentMode: 'Cash' | 'UPI';
     sevaCategory: string;
@@ -493,8 +502,8 @@ function App() {
       donationId,
       submittedAt: new Date().toISOString(),
       donorName: formData.donorName || 'Devotee',
-      mobile: '',
-      phone: '',
+      mobile: (formData.mobile || '').trim(),
+      phone: (formData.mobile || '').trim(),
       email: formData.email || '',
       amount: formData.amount,
       paymentMode: formData.paymentMode,
@@ -607,7 +616,6 @@ function App() {
   const handleRefreshVolunteers = async () => {
     const result = await googleSheetsService.fetchVolunteers();
 
-    //alert('VOLUNTEER REFRESH RESULT:\n\n' + JSON.stringify(result, null, 2));
     if (!result.success || !result.volunteers) {
       console.error(
         'VOLUNTEER REFRESH ERROR:',
