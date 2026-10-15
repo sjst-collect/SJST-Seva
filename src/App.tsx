@@ -616,6 +616,7 @@ function App() {
   const handleRefreshVolunteers = async () => {
     const result = await googleSheetsService.fetchVolunteers();
 
+    //alert('VOLUNTEER REFRESH RESULT:\n\n' + JSON.stringify(result, null, 2));
     if (!result.success || !result.volunteers) {
       console.error(
         'VOLUNTEER REFRESH ERROR:',
@@ -1050,7 +1051,7 @@ function App() {
           </div>
 
           <div className="text-sm font-semibold text-slate-100 font-serif">
-            Designed &amp; developed by <strong className="text-amber-400">Sachin Parab</strong>
+            Designed &amp; developed by <strong className="text-amber-400">Sachin Parab/Prasana Petro</strong>
           </div>
 
           <div className="text-sm font-bold text-amber-300 font-serif">
