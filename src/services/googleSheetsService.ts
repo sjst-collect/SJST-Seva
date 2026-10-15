@@ -627,22 +627,6 @@ export async function syncDonationToGoogleSheet(
         }
       };
 
-      alert(
-  'WEBHOOK PAYLOAD DEBUG\n' +
-  'Action: ' + (webhookPayload.action || '') + '\n' +
-  'Record Mobile: ' + (webhookPayload.record?.mobile || '') + '\n' +
-  'Record Phone: ' + (webhookPayload.record?.phone || '') + '\n' +
-  'Webhook URL configured: ' + Boolean(webhookUrl)
-);
-
-alert(
-  'WEBHOOK PAYLOAD DEBUG\n' +
-  'Action: ' + (webhookPayload.action || '') + '\n' +
-  'Record Mobile: ' + (webhookPayload.record?.mobile || '') + '\n' +
-  'Record Phone: ' + (webhookPayload.record?.phone || '') + '\n' +
-  'Webhook URL configured: ' + Boolean(webhookUrl)
-);
-
       await fetch(webhookUrl, {
         method: 'POST',
         mode: 'no-cors', // Crucial: Bypasses browser CORS preflight check
