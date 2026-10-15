@@ -157,16 +157,6 @@ export function DonorForm({
     if (!submittedDonation) return;
     setIsPushingSheet(true);
     setSheetPushResult(null);
-
-    alert(
-      'MOBILE DEBUG\n' +
-      'Donor: ' + (donation.donorName || '') + '\n' +
-      'Mobile: ' + (donation.mobile || '') + '\n' +
-      'Phone: ' + (donation.phone || '') + '\n' +
-      'Record Mobile: ' + (webhookPayload.record?.mobile || '') + '\n' +
-      'Record Phone: ' + (webhookPayload.record?.phone || '')
-    );
-
     try {
       const res = await syncDonationToGoogleSheet(submittedDonation, accessToken);
       if (res.success) {
